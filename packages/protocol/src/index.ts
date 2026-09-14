@@ -920,18 +920,95 @@ export function validateDocument(value: unknown, rootDir = sourceRoot): Validati
 }
 
 export function validateParseJob(value: unknown, rootDir = sourceRoot): ValidationResult<ParseJob> {
-  return validate<ParseJob>('parse-job', value, rootDir);
+  const result = validate<ParseJob>('parse-job', value, rootDir);
+  if (!result.ok) return result;
+  const errors: ValidationError[] = [];
+  const hasResult = result.value.result !== undefined && result.value.result !== null;
+  const hasError = result.value.error !== undefined && result.value.error !== null;
+  if (['queued', 'running'].includes(result.value.status) && (hasResult || hasError)) {
+    errors.push({
+      path: '/status',
+      keyword: 'semantic',
+      message: 'queued or running parse jobs cannot contain a result or error',
+    });
+  }
+  if (['succeeded', 'partial', 'needs_confirmation'].includes(result.value.status)) {
+    if (!hasResult)
+      errors.push({
+        path: '/result',
+        keyword: 'semantic',
+        message: 'completed parse jobs require a result',
+      });
+    if (hasError)
+      errors.push({
+        path: '/error',
+        keyword: 'semantic',
+        message: 'successful parse jobs cannot contain an error',
+      });
+  }
+  if (result.value.status === 'failed' && !hasError) {
+    errors.push({
+      path: '/error',
+      keyword: 'semantic',
+      message: 'failed parse jobs require an error',
+    });
+  }
+  if (errors.length) return { ok: false, errors };
+  return result;
 }
 
 export function validateTask(value: unknown, rootDir = sourceRoot): ValidationResult<Task> {
-  return validate<Task>('task', value, rootDir);
+  const result = validate<Task>('task', value, rootDir);
+  if (!result.ok) return result;
+  if (result.value.status === 'completed' && result.value.completed_at === null) {
+    return {
+      ok: false,
+      errors: [
+        {
+          path: '/completed_at',
+          keyword: 'semantic',
+          message: 'completed tasks require completed_at',
+        },
+      ],
+    };
+  }
+  if (result.value.status !== 'completed' && result.value.completed_at !== null) {
+    return {
+      ok: false,
+      errors: [
+        {
+          path: '/completed_at',
+          keyword: 'semantic',
+          message: 'only completed tasks may contain completed_at',
+        },
+      ],
+    };
+  }
+  return result;
 }
 
 export function validateNotificationRevision(
   value: unknown,
   rootDir = sourceRoot,
 ): ValidationResult<NotificationRevision> {
-  return validate<NotificationRevision>('notification-revision', value, rootDir);
+  const result = validate<NotificationRevision>('notification-revision', value, rootDir);
+  if (!result.ok) return result;
+  const isDraft = result.value.status === 'draft';
+  if (isDraft !== (result.value.published_at === null)) {
+    return {
+      ok: false,
+      errors: [
+        {
+          path: '/published_at',
+          keyword: 'semantic',
+          message: isDraft
+            ? 'draft revisions cannot contain published_at'
+            : 'non-draft revisions require published_at',
+        },
+      ],
+    };
+  }
+  return result;
 }
 
 export function validateError(value: unknown, rootDir = sourceRoot): ValidationResult<ApiError> {

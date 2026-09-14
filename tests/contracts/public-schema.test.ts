@@ -80,6 +80,44 @@ test('public domain schemas are loadable and reject unknown fields', () => {
     }).ok,
     true,
   );
+  const parseError = {
+    code: 'PARSER_TIMEOUT',
+    message: 'timeout',
+    requestId: 'req-1',
+    retryable: true,
+  };
+  assert.equal(
+    validateParseJob({
+      schema_version: 'parse-job/v1',
+      parse_job_id: 'job-invalid-state',
+      document_id: 'doc-1',
+      user_id: 'user-1',
+      request_id: 'req-1',
+      idempotency_key: 'key-invalid-state',
+      status: 'running',
+      result: null,
+      error: parseError,
+      created_at: timestamp,
+      updated_at: timestamp,
+    }).ok,
+    false,
+  );
+  assert.equal(
+    validateParseJob({
+      schema_version: 'parse-job/v1',
+      parse_job_id: 'job-invalid-failed',
+      document_id: 'doc-1',
+      user_id: 'user-1',
+      request_id: 'req-1',
+      idempotency_key: 'key-invalid-failed',
+      status: 'failed',
+      result: null,
+      error: null,
+      created_at: timestamp,
+      updated_at: timestamp,
+    }).ok,
+    false,
+  );
   assert.equal(
     validateTask({
       schema_version: 'task/v1',
@@ -97,6 +135,38 @@ test('public domain schemas are loadable and reject unknown fields', () => {
     true,
   );
   assert.equal(
+    validateTask({
+      schema_version: 'task/v1',
+      task_id: 'completed-without-time',
+      user_id: 'user-1',
+      action_id: 'action-1',
+      document_id: 'doc-1',
+      title: '做事',
+      status: 'completed',
+      due_at: null,
+      created_at: timestamp,
+      updated_at: timestamp,
+      completed_at: null,
+    }).ok,
+    false,
+  );
+  assert.equal(
+    validateTask({
+      schema_version: 'task/v1',
+      task_id: 'pending-with-time',
+      user_id: 'user-1',
+      action_id: 'action-1',
+      document_id: 'doc-1',
+      title: '做事',
+      status: 'pending',
+      due_at: null,
+      created_at: timestamp,
+      updated_at: timestamp,
+      completed_at: timestamp,
+    }).ok,
+    false,
+  );
+  assert.equal(
     validateNotificationRevision({
       schema_version: 'notification-revision/v1',
       notice_id: 'notice-1',
@@ -109,6 +179,20 @@ test('public domain schemas are loadable and reject unknown fields', () => {
       published_at: null,
     }).ok,
     true,
+  );
+  assert.equal(
+    validateNotificationRevision({
+      schema_version: 'notification-revision/v1',
+      notice_id: 'notice-1',
+      revision_id: 'revision-invalid',
+      revision_number: 2,
+      status: 'published',
+      title: '通知',
+      body: '合成内容',
+      created_at: timestamp,
+      published_at: null,
+    }).ok,
+    false,
   );
   assert.equal(
     validateError({

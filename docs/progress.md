@@ -27,5 +27,6 @@
 - 学生端导入页接入 PNG/PDF 选择、受限 Base64 上传和解析失败人工建任务；解析结果页也提供同一回退入口，未把失败状态伪装为成功。
 - 本轮完整 `npm.cmd run check`、API/E2E、数据库、夹具/评估和 PowerShell 启动验证均通过；评估阈值与微信人工验收状态仍如实保留为未达成。
 - 收紧用户画像 PATCH 契约：现在要求 scoped `Idempotency-Key`，重放不重复写入，key 冲突返回统一 409，并追加 `profile.updated` 审计事件；小程序客户端已同步携带幂等键。
+- 加强公共状态语义校验：ParseJob 的处理中/完成/失败状态与 result/error 必须一致，Task 的 completed_at 只允许出现在 completed 状态，非草稿通知 revision 必须有 published_at；新增契约失败测试。
 
 仍为 `NOT_READY`：真实 OCR/provider、正式 800 条冻结评测、微信开发者工具人工验证、真实认证/提醒和生产部署均缺失；本地测试不能替代这些证据。

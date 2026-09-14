@@ -106,6 +106,16 @@ function contentType(value: unknown): Document['content_type'] {
   throw new RepositoryError('UNSUPPORTED_CONTENT_TYPE', 415, 'Unsupported document content type');
 }
 
+function dataOrigin(value: unknown): Document['data_origin'] {
+  if (value === undefined) return 'user_provided';
+  if (value === 'synthetic' || value === 'user_provided') return value;
+  throw new RepositoryError(
+    'INVALID_REQUEST',
+    400,
+    'data_origin must be synthetic or user_provided',
+  );
+}
+
 async function parserRequest(
   url: string,
   requestId: string,
@@ -339,7 +349,7 @@ async function handle(
       title: stringField(body, 'title', false) ?? '校园通知',
       contentType: contentType(body.contentType),
       text: text!,
-      dataOrigin: body.data_origin === 'synthetic' ? 'synthetic' : 'user_provided',
+      dataOrigin: dataOrigin(body.data_origin),
     });
     const output = { document };
     repository.saveIdempotency(userId, path, key, hash, 201, output);

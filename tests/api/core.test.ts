@@ -47,6 +47,25 @@ test('API closes the document → parse job → verified action → confirmed ta
       college: '虚构学院',
     });
     assert.equal(profile.result.status, 200);
+    const invalidOrigin = await call(
+      'POST',
+      '/documents',
+      {
+        title: '来源元数据错误',
+        text: '适用对象：本科生\n1. 提交材料',
+        data_origin: 'fixture',
+      },
+      { 'idempotency-key': 'invalid-origin-1', 'x-request-id': 'origin-request-1' },
+    );
+    assert.equal(invalidOrigin.result.status, 400);
+    assert.equal(invalidOrigin.parsed.error.code, 'INVALID_REQUEST');
+    assert.equal(invalidOrigin.parsed.error.requestId, 'origin-request-1');
+    assert.equal(invalidOrigin.result.headers.get('x-request-id'), 'origin-request-1');
+    assert.equal(
+      (repository.db.prepare('SELECT count(*) AS count FROM documents').get() as { count: number })
+        .count,
+      0,
+    );
     const text =
       '【虚构大学教务处】\n适用对象：本科生\n1. 在线系统提交申请\n2. 到现场核验材料\n截止：2099-10-03 17:00 前\n材料：学生证、成绩单\n地点：A楼101\n平台：https://example.invalid/apply';
     const document = await call(

@@ -503,7 +503,13 @@ async function handle(
     const key = idempotencyKey(request, body);
     const document = repository.getDocument(userId, segments[1]);
     if (!document) throw new RepositoryError('DOCUMENT_NOT_FOUND', 404, 'Document not found');
-    const job = repository.createParseJob(userId, document.document_id, requestId, key);
+    const job = repository.createParseJob(
+      userId,
+      document.document_id,
+      requestId,
+      key,
+      requestHash(body),
+    );
     if (!job.existed) {
       repository.startParseJob(userId, job.parseJobId, requestId);
       await parseDocument(

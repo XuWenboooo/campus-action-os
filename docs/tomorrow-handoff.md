@@ -1,6 +1,6 @@
 # Handoff
 
-当前工作树包含用户生成且未跟踪的 `output/`、`tmp/` 和 `tools/create_*_pdf.py`，不要删除或提交。工程代码已完成本地 SQLite/AI/API 文本闭环，并补充了评测指标、文件持久化验证、HTML 标准化、图片/PDF 的明确 OCR 降级、条件 Action Graph 分支、通知修订到既有 Task 的待确认同步、学生端同步提示、100 轮稳定性 E2E、跨文档 Evidence 主键修复、多阶段截止绑定、来源元数据拒绝、所有现有 PATCH 的幂等保护、文档软删除幂等、Action/Task 状态同步与拒绝取消、Parser 拒答结果持久化、受限二进制上传持久化、共享 Error Shield 悬空引用校验、发布角色闸门、解析失败后的人工建任务回退、公共状态语义校验，以及“完成后 Action 不可拒绝、用户 Task 截止时间覆盖不被 Action 标题编辑重置”的状态机回归保护，下一轮优先：
+当前工作树包含用户生成且未跟踪的 `output/`、`tmp/` 和 `tools/create_*_pdf.py`，不要删除或提交。工程代码已完成本地 SQLite/AI/API 文本闭环，并补充了评测指标、文件持久化验证、HTML 标准化、图片/PDF 的明确 OCR 降级、条件 Action Graph 分支、通知修订到既有 Task 的待确认同步、学生端同步提示、100 轮稳定性 E2E、跨文档 Evidence 主键修复、多阶段截止绑定、来源元数据拒绝、所有现有 PATCH 的幂等保护、文档软删除幂等、Action/Task 状态同步与拒绝取消、Parser 拒答结果持久化、受限二进制上传持久化、共享 Error Shield 悬空引用校验、发布角色闸门、解析失败后的人工建任务回退、公共状态语义校验、完成后 Action 不可拒绝、用户 Task 截止时间覆盖保护，以及 ParseJob 请求哈希幂等保护，下一轮优先：
 
 1. 继续覆盖多阶段图的真实业务语义，并为通知同步增加更完整的用户界面提示；
 2. 接入受控、可审计的 OCR/版面解析实现，并保持无凭据 provider 为 `OCR_NOT_CONFIGURED`；

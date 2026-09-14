@@ -131,6 +131,14 @@ test('API closes the document → parse job → verified action → confirmed ta
     assert.equal(parsed.parsed.status, 'succeeded');
     assert.equal(parsed.parsed.result.verified_actions.length, 2);
     assert.equal(parsed.parsed.result.action_graph.edges.length, 1);
+    const parseConflict = await call(
+      'POST',
+      `/documents/${documentId}/parse`,
+      { rerun: true },
+      { 'idempotency-key': 'parse-loop-1' },
+    );
+    assert.equal(parseConflict.result.status, 409);
+    assert.equal(parseConflict.parsed.error.code, 'IDEMPOTENCY_CONFLICT');
     assert.equal(
       (
         repository.db

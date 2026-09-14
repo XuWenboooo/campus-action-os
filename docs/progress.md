@@ -32,5 +32,6 @@
 - 修复 Action/Task 状态一致性：编辑带有活动 Task 的 Action 会事务内同步标题/截止时间；拒绝已有 Action 会取消关联的 pending/in_progress Task，并记录 Task 事件与审计。
 - 修复协议级 Parser 拒答持久化：`rejected` 响应写入 failed ParseJob 时同时保留原始 result 和 `PARSER_REJECTED` error，读取不会触发状态语义损坏。
 - 收紧 Action/Task 状态机边界：已完成 Task 对应的 Action 不得再次拒绝；Action PATCH 只同步本次明确修改的标题/截止时间，保留用户对 Task 截止时间的独立覆盖，并加入 API 回归断言。
+- 补齐解析请求幂等一致性：新增 SQLite 迁移保存 ParseJob 的内部 `request_hash`，同一用户/文档/key 携带不同解析请求体时统一返回 `IDEMPOTENCY_CONFLICT`，并加入 API 回归测试。
 
 仍为 `NOT_READY`：真实 OCR/provider、正式 800 条冻结评测、微信开发者工具人工验证、真实认证/提醒和生产部署均缺失；本地测试不能替代这些证据。

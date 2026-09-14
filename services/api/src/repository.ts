@@ -484,21 +484,21 @@ export class Repository {
     documentId: string,
     requestId: string,
     idempotencyKey: string,
+    requestHash: string,
   ): { parseJobId: string; existed: boolean } {
     const document = this.getDocument(userId, documentId);
     if (!document) throw new RepositoryError('DOCUMENT_NOT_FOUND', 404, 'Document not found');
     const existing = this.db
-      .prepare('SELECT parse_job_id FROM parse_jobs WHERE user_id = ? AND idempotency_key = ?')
+      .prepare(
+        'SELECT parse_job_id, document_id, request_hash FROM parse_jobs WHERE user_id = ? AND idempotency_key = ?',
+      )
       .get(userId, idempotencyKey) as Row | undefined;
     if (existing) {
-      const same = this.db
-        .prepare('SELECT document_id FROM parse_jobs WHERE parse_job_id = ?')
-        .get(String(existing.parse_job_id)) as Row;
-      if (text(same.document_id) !== documentId)
+      if (text(existing.document_id) !== documentId || text(existing.request_hash) !== requestHash)
         throw new RepositoryError(
           'IDEMPOTENCY_CONFLICT',
           409,
-          'Idempotency key is bound to another document',
+          'Idempotency key was reused with a different parse request',
         );
       return { parseJobId: text(existing.parse_job_id), existed: true };
     }
@@ -506,7 +506,7 @@ export class Repository {
     const timestamp = now();
     this.db
       .prepare(
-        'INSERT INTO parse_jobs (parse_job_id, document_id, user_id, request_id, idempotency_key, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+        'INSERT INTO parse_jobs (parse_job_id, document_id, user_id, request_id, idempotency_key, request_hash, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
       )
       .run(
         parseJobId,
@@ -514,6 +514,7 @@ export class Repository {
         userId,
         requestId,
         idempotencyKey,
+        requestHash,
         'queued',
         timestamp,
         timestamp,

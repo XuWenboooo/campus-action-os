@@ -8,15 +8,69 @@
   "passed": 9,
   "failed": 0,
   "scenarios": [
-    "normal-review-confirmation",
-    "irrelevant-no-task",
-    "partial-warning-confirmation",
-    "needs-confirmation-explicit-choice",
-    "invalid-response-quarantine",
-    "timeout-retryable",
-    "idempotent-replay",
-    "idempotency-key-reuse-rejected",
-    "unmatched-rejected"
+    {
+      "id": "normal-review-confirmation",
+      "status": "PASS",
+      "assertions": 6,
+      "tasks_before_confirmation": 0,
+      "tasks_after_confirmation": 1
+    },
+    {
+      "id": "irrelevant-no-task",
+      "status": "PASS",
+      "assertions": 5,
+      "tasks_before_confirmation": 0,
+      "tasks_after_confirmation": 0
+    },
+    {
+      "id": "partial-warning-confirmation",
+      "status": "PASS",
+      "assertions": 6,
+      "tasks_before_confirmation": 0,
+      "tasks_after_confirmation": 1
+    },
+    {
+      "id": "needs-confirmation-explicit-choice",
+      "status": "PASS",
+      "assertions": 5,
+      "tasks_before_confirmation": 0,
+      "tasks_after_confirmation": 1
+    },
+    {
+      "id": "invalid-response-quarantine",
+      "status": "PASS",
+      "assertions": 4,
+      "tasks_before_confirmation": 0,
+      "tasks_after_confirmation": 0
+    },
+    {
+      "id": "timeout-retryable",
+      "status": "PASS",
+      "assertions": 5,
+      "tasks_before_confirmation": 0,
+      "tasks_after_confirmation": 0
+    },
+    {
+      "id": "idempotent-replay",
+      "status": "PASS",
+      "assertions": 4,
+      "tasks_before_confirmation": 0,
+      "tasks_after_confirmation": 1
+    },
+    {
+      "id": "idempotency-key-reuse-rejected",
+      "status": "PASS",
+      "assertions": 3,
+      "tasks_before_confirmation": 0,
+      "tasks_after_confirmation": 0
+    },
+    {
+      "id": "unmatched-rejected",
+      "status": "PASS",
+      "assertions": 3,
+      "tasks_before_confirmation": 0,
+      "tasks_after_confirmation": 0
+    }
   ],
   "local_commands": [
     "npm ci",
@@ -33,6 +87,9 @@
     "npm run check"
   ],
   "remote_ci": {
-    "status": "PENDING_FINAL_PUSH"
+    "status": "PASS",
+    "run_id": 34820745689,
+    "head_sha": "9e53b3f4df4318c7d3a3cf058b14d42ffc2ef269",
+    "url": "https://github.com/XuWenboooo/campus-action-os/actions/runs/34820745689"
   }
 }

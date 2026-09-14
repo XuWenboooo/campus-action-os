@@ -38,6 +38,8 @@ The final command outcomes and exact acceptance JSON are recorded in
 
 ## Remote evidence
 
-- Feature branch push and GitHub Actions run are recorded in the final handoff report.
+- Feature branch push succeeded. GitHub Actions CI run `34820745689` completed with `success` for
+  commit `9e53b3f4df4318c7d3a3cf058b14d42ffc2ef269`:
+  https://github.com/XuWenboooo/campus-action-os/actions/runs/34820745689
 - No force push, tag rewrite, or modification of the existing M2 tag is part of this runbook.
 - The existing `main` and `m2-text-contract-v0.1.0` baseline remain the comparison anchors.

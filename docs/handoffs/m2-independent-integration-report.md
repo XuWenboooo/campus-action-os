@@ -32,12 +32,14 @@ API/persistence. Product and AI owners can integrate behind the existing M2 prot
 Use `npm ci`, `npm run demo:m2`, `npm run acceptance:m2`, and `npm run check` from a clean clone.
 The remote feature-branch CI result is recorded below after push.
 
-| Evidence                      | Result |
-| ----------------------------- | ------ |
-| Local aggregate check         | PASS   |
-| Feature branch GitHub Actions | PASS   |
-| Existing M2 tag rewritten     | NO     |
-| Force push used               | NO     |
+| Evidence                      | Result                                     |
+| ----------------------------- | ------------------------------------------ |
+| Local aggregate check         | PASS                                       |
+| Feature branch GitHub Actions | PASS — run `34820745689`, commit `9e53b3f` |
+| Existing M2 tag rewritten     | NO                                         |
+| Force push used               | NO                                         |
+
+Remote CI: https://github.com/XuWenboooo/campus-action-os/actions/runs/34820745689
 
 ## Next owner actions
 

@@ -105,6 +105,29 @@ components:
             properties:
               decision: { enum: [accept, reject] }
               confirmed: { const: true }
+    ActionPatch:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            minProperties: 1
+            properties:
+              title: { type: string, minLength: 1 }
+              summary: { type: string, minLength: 1 }
+              deadline: { type: object }
+              required_materials: { type: array }
+    TaskPatch:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            minProperties: 1
+            properties:
+              title: { type: string, minLength: 1 }
+              status: { enum: [pending, in_progress, completed, expired, cancelled] }
+              due_at: { anyOf: [{ type: string }, { type: 'null' }] }
   responses:
     Error:
       description: Unified error object
@@ -222,7 +245,10 @@ paths:
         }
     patch:
       security: [{ devUser: [] }]
-      parameters: [{ $ref: '#/components/parameters/ActionId' }]
+      parameters:
+        - { $ref: '#/components/parameters/ActionId' }
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+      requestBody: { $ref: '#/components/requestBodies/ActionPatch' }
       responses: { '200': { description: Updated action } }
   /tasks:
     get:
@@ -252,6 +278,8 @@ paths:
       responses: { '200': { description: Task } }
     patch:
       security: [{ devUser: [] }]
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody: { $ref: '#/components/requestBodies/TaskPatch' }
       responses:
         { '200': { description: Updated task }, '409': { $ref: '#/components/responses/Error' } }
   /tasks/{taskId}/complete:

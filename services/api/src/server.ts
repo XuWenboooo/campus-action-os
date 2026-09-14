@@ -489,24 +489,47 @@ async function handle(
     return;
   }
   if (segments[0] === 'actions' && segments[1] && request.method === 'PATCH') {
+    const key = idempotencyKey(request, body);
+    const hash = requestHash(body);
+    const previous = repository.getIdempotency(userId, path, key, hash);
+    if (previous === 'conflict')
+      throw new RepositoryError(
+        'IDEMPOTENCY_CONFLICT',
+        409,
+        'Idempotency key was reused with a different request',
+      );
+    if (previous) {
+      send(response, previous.status, previous.body, requestId);
+      return;
+    }
     const actionPatch: Partial<
       Pick<VerifiedActionObject, 'title' | 'summary' | 'deadline' | 'required_materials'>
     > = {};
-    if (typeof body.title === 'string') actionPatch.title = body.title;
-    if (typeof body.summary === 'string') actionPatch.summary = body.summary;
-    if (body.deadline !== undefined)
+    const hasField = (field: string): boolean => Object.prototype.hasOwnProperty.call(body, field);
+    if (!['title', 'summary', 'deadline', 'required_materials'].some(hasField))
+      throw new RepositoryError('INVALID_REQUEST', 400, 'At least one action field is required');
+    if (hasField('title')) actionPatch.title = stringField(body, 'title')!;
+    if (hasField('summary')) actionPatch.summary = stringField(body, 'summary')!;
+    if (hasField('deadline')) {
+      if (
+        typeof body.deadline !== 'object' ||
+        body.deadline === null ||
+        Array.isArray(body.deadline)
+      )
+        throw new RepositoryError('INVALID_REQUEST', 400, 'deadline must be an object');
       actionPatch.deadline = body.deadline as VerifiedActionObject['deadline'];
-    if (body.required_materials !== undefined)
+    }
+    if (hasField('required_materials')) {
+      if (!Array.isArray(body.required_materials))
+        throw new RepositoryError('INVALID_REQUEST', 400, 'required_materials must be an array');
       actionPatch.required_materials =
         body.required_materials as VerifiedActionObject['required_materials'];
-    send(
-      response,
-      200,
-      {
-        action: repository.updateAction(userId, segments[1], actionPatch, requestId),
-      },
-      requestId,
-    );
+    }
+    const output = {
+      action: repository.updateAction(userId, segments[1], actionPatch, requestId),
+    };
+    repository.saveIdempotency(userId, path, key, hash, 200, output);
+    send(response, 200, output, requestId);
     return;
   }
 
@@ -628,24 +651,49 @@ async function handle(
     request.method === 'PATCH' &&
     segments.length === 2
   ) {
-    send(
-      response,
-      200,
-      {
-        task: repository.updateTask(
-          userId,
-          segments[1],
-          {
-            title: typeof body.title === 'string' ? body.title : undefined,
-            status: body.status as Task['status'] | undefined,
-            due_at:
-              body.due_at === null || typeof body.due_at === 'string' ? body.due_at : undefined,
-          },
-          requestId,
-        ),
-      },
-      requestId,
-    );
+    const key = idempotencyKey(request, body);
+    const hash = requestHash(body);
+    const previous = repository.getIdempotency(userId, path, key, hash);
+    if (previous === 'conflict')
+      throw new RepositoryError(
+        'IDEMPOTENCY_CONFLICT',
+        409,
+        'Idempotency key was reused with a different request',
+      );
+    if (previous) {
+      send(response, previous.status, previous.body, requestId);
+      return;
+    }
+    const hasField = (field: string): boolean => Object.prototype.hasOwnProperty.call(body, field);
+    if (!['title', 'status', 'due_at'].some(hasField))
+      throw new RepositoryError('INVALID_REQUEST', 400, 'At least one task field is required');
+    if (hasField('title')) stringField(body, 'title');
+    if (hasField('status')) {
+      if (
+        !['pending', 'in_progress', 'completed', 'expired', 'cancelled'].includes(
+          body.status as string,
+        )
+      )
+        throw new RepositoryError('INVALID_REQUEST', 400, 'status is not a valid task status');
+    }
+    if (hasField('due_at') && body.due_at !== null) {
+      if (typeof body.due_at !== 'string' || body.due_at.trim().length === 0)
+        throw new RepositoryError('INVALID_REQUEST', 400, 'due_at must be a date string or null');
+    }
+    const output = {
+      task: repository.updateTask(
+        userId,
+        segments[1],
+        {
+          title: hasField('title') ? stringField(body, 'title') : undefined,
+          status: hasField('status') ? (body.status as Task['status']) : undefined,
+          due_at: hasField('due_at') ? (body.due_at as string | null) : undefined,
+        },
+        requestId,
+      ),
+    };
+    repository.saveIdempotency(userId, path, key, hash, 200, output);
+    send(response, 200, output, requestId);
     return;
   }
   if (

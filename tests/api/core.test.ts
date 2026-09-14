@@ -144,9 +144,29 @@ test('API closes the document → parse job → verified action → confirmed ta
       { 'idempotency-key': 'confirm-1' },
     );
     assert.deepEqual(confirmationReplay.parsed, confirmation.parsed);
-    const edited = await call('PATCH', `/actions/${actionId}`, { title: '用户确认后的申请任务' });
+    const edited = await call(
+      'PATCH',
+      `/actions/${actionId}`,
+      { title: '用户确认后的申请任务' },
+      { 'idempotency-key': 'action-patch-1' },
+    );
     assert.equal(edited.result.status, 200);
     assert.equal(edited.parsed.action.title, '用户确认后的申请任务');
+    const editedReplay = await call(
+      'PATCH',
+      `/actions/${actionId}`,
+      { title: '用户确认后的申请任务' },
+      { 'idempotency-key': 'action-patch-1' },
+    );
+    assert.deepEqual(editedReplay.parsed, edited.parsed);
+    const editedConflict = await call(
+      'PATCH',
+      `/actions/${actionId}`,
+      { title: '同一 key 的不同修改' },
+      { 'idempotency-key': 'action-patch-1' },
+    );
+    assert.equal(editedConflict.result.status, 409);
+    assert.equal(editedConflict.parsed.error.code, 'IDEMPOTENCY_CONFLICT');
     assert.equal(
       (
         repository.db
@@ -176,10 +196,28 @@ test('API closes the document → parse job → verified action → confirmed ta
     const task = await call('POST', '/tasks', { actionId }, { 'idempotency-key': 'task-loop-1' });
     assert.equal(task.result.status, 201);
     assert.equal(task.parsed.task.status, 'pending');
-    const started = await call('PATCH', `/tasks/${task.parsed.task.task_id}`, {
-      status: 'in_progress',
-    });
+    const invalidTaskPatch = await call(
+      'PATCH',
+      `/tasks/${task.parsed.task.task_id}`,
+      { status: 'not-a-status' },
+      { 'idempotency-key': 'task-patch-invalid-1' },
+    );
+    assert.equal(invalidTaskPatch.result.status, 400);
+    assert.equal(invalidTaskPatch.parsed.error.code, 'INVALID_REQUEST');
+    const started = await call(
+      'PATCH',
+      `/tasks/${task.parsed.task.task_id}`,
+      { status: 'in_progress' },
+      { 'idempotency-key': 'task-patch-1' },
+    );
     assert.equal(started.result.status, 200);
+    const startedReplay = await call(
+      'PATCH',
+      `/tasks/${task.parsed.task.task_id}`,
+      { status: 'in_progress' },
+      { 'idempotency-key': 'task-patch-1' },
+    );
+    assert.deepEqual(startedReplay.parsed, started.parsed);
     const missingCompleteConfirmation = await call(
       'POST',
       `/tasks/${task.parsed.task.task_id}/complete`,
@@ -206,9 +244,12 @@ test('API closes the document → parse job → verified action → confirmed ta
     assert.deepEqual(completedReplay.parsed, completed.parsed);
     const actionAfterComplete = await call('GET', `/actions/${actionId}`);
     assert.equal(actionAfterComplete.parsed.action.task_status, 'completed');
-    const illegal = await call('PATCH', `/tasks/${task.parsed.task.task_id}`, {
-      status: 'pending',
-    });
+    const illegal = await call(
+      'PATCH',
+      `/tasks/${task.parsed.task.task_id}`,
+      { status: 'pending' },
+      { 'idempotency-key': 'task-patch-illegal-1' },
+    );
     assert.equal(illegal.result.status, 409);
     assert.equal(illegal.parsed.error.code, 'INVALID_STATE_TRANSITION');
     const unknown = await call('GET', '/does-not-exist', undefined, {

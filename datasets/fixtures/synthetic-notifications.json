@@ -5,7 +5,15 @@
     "benchmark_status": "development_only",
     "category": "academic",
     "text": "适用对象：本科生\n1. 提交选课申请\n截止：2099-09-01 17:00 前",
-    "expected": { "relevance": "relevant", "deadline": "explicit" }
+    "expected": {
+      "relevance": "relevant",
+      "deadline": "explicit",
+      "evidence_spans": [
+        [9, 18],
+        [19, 40],
+        [0, 8]
+      ]
+    }
   },
   {
     "fixture_id": "SYN-002",
@@ -13,7 +21,15 @@
     "benchmark_status": "development_only",
     "category": "academic",
     "text": "适用对象：研究生\n1. 上传论文\n截止：2099-09-02 12:00 前",
-    "expected": { "relevance": "uncertain", "deadline": "explicit" }
+    "expected": {
+      "relevance": "uncertain",
+      "deadline": "explicit",
+      "evidence_spans": [
+        [9, 16],
+        [17, 38],
+        [0, 8]
+      ]
+    }
   },
   {
     "fixture_id": "SYN-003",
@@ -21,18 +37,33 @@
     "benchmark_status": "development_only",
     "category": "student-affairs",
     "text": "适用对象：全体学生\n1. 填写安全问卷\n截止：2099-09-03",
-    "expected": { "relevance": "relevant", "deadline": "explicit" }
+    "expected": {
+      "relevance": "relevant",
+      "deadline": "explicit",
+      "evidence_spans": [
+        [10, 19],
+        [20, 33],
+        [0, 9]
+      ]
+    }
   },
   {
     "fixture_id": "SYN-004",
     "data_origin": "synthetic",
     "benchmark_status": "development_only",
     "category": "scholarship",
+    "user_profile": { "student_categories": ["困难生"] },
     "text": "适用对象：困难生\n1. 提交申请\n材料：申请表、证明材料\n截止：2099-09-04 18:00 前",
     "expected": {
       "relevance": "relevant",
       "deadline": "explicit",
-      "materials": ["申请表", "证明材料"]
+      "materials": ["申请表", "证明材料"],
+      "evidence_spans": [
+        [9, 16],
+        [17, 28],
+        [29, 50],
+        [0, 8]
+      ]
     }
   },
   {
@@ -41,7 +72,16 @@
     "benchmark_status": "development_only",
     "category": "exam",
     "text": "适用对象：本科生\n1. 到现场核验\n地点：教学楼101\n截止：2099-09-05 09:00 前",
-    "expected": { "relevance": "relevant", "deadline": "explicit" }
+    "expected": {
+      "relevance": "relevant",
+      "deadline": "explicit",
+      "evidence_spans": [
+        [9, 17],
+        [18, 27],
+        [28, 49],
+        [0, 8]
+      ]
+    }
   },
   {
     "fixture_id": "SYN-006",
@@ -49,15 +89,33 @@
     "benchmark_status": "development_only",
     "category": "competition",
     "text": "适用对象：参赛队员\n1. 上传作品\n2. 现场答辩\n截止时间待确认",
-    "expected": { "relevance": "uncertain", "deadline": "unknown" }
+    "expected": {
+      "relevance": "uncertain",
+      "deadline": "unknown",
+      "action_count": 2,
+      "evidence_spans": [
+        [10, 17],
+        [26, 33],
+        [0, 9]
+      ]
+    }
   },
   {
     "fixture_id": "SYN-007",
     "data_origin": "synthetic",
     "benchmark_status": "development_only",
     "category": "club",
+    "user_profile": { "organization_memberships": ["社团成员"] },
     "text": "适用对象：社团成员\n1. 填写报名表\n平台：https://example.invalid/club",
-    "expected": { "relevance": "relevant", "deadline": "unknown" }
+    "expected": {
+      "relevance": "relevant",
+      "deadline": "unknown",
+      "evidence_spans": [
+        [10, 18],
+        [19, 50],
+        [0, 9]
+      ]
+    }
   },
   {
     "fixture_id": "SYN-008",
@@ -65,15 +123,33 @@
     "benchmark_status": "development_only",
     "category": "employment",
     "text": "适用对象：毕业生\n1. 参加宣讲会\n地点：报告厅\n时间另行通知",
-    "expected": { "relevance": "uncertain", "deadline": "unknown" }
+    "expected": {
+      "relevance": "uncertain",
+      "deadline": "unknown",
+      "evidence_spans": [
+        [9, 17],
+        [18, 24],
+        [25, 31],
+        [0, 8]
+      ]
+    }
   },
   {
     "fixture_id": "SYN-009",
     "data_origin": "synthetic",
     "benchmark_status": "development_only",
     "category": "dormitory",
+    "user_profile": { "student_categories": ["住宿学生"] },
     "text": "适用对象：住宿学生\n1. 完成宿舍检查\n截止：2099-09-09 前",
-    "expected": { "relevance": "relevant", "deadline": "explicit" }
+    "expected": {
+      "relevance": "relevant",
+      "deadline": "explicit",
+      "evidence_spans": [
+        [10, 19],
+        [20, 35],
+        [0, 9]
+      ]
+    }
   },
   {
     "fixture_id": "SYN-010",
@@ -81,7 +157,15 @@
     "benchmark_status": "development_only",
     "category": "public-service",
     "text": "适用对象：全体学生\n1. 预约服务\n平台：校园服务系统",
-    "expected": { "relevance": "relevant", "deadline": "unknown" }
+    "expected": {
+      "relevance": "relevant",
+      "deadline": "unknown",
+      "evidence_spans": [
+        [10, 17],
+        [18, 27],
+        [0, 9]
+      ]
+    }
   },
   {
     "fixture_id": "SYN-011",
@@ -89,18 +173,33 @@
     "benchmark_status": "development_only",
     "category": "academic",
     "text": "适用对象：本科生\n1. 补交作业\n截止：2099-09-11 23:59 前",
-    "expected": { "relevance": "relevant", "deadline": "explicit" }
+    "expected": {
+      "relevance": "relevant",
+      "deadline": "explicit",
+      "evidence_spans": [
+        [9, 16],
+        [17, 38],
+        [0, 8]
+      ]
+    }
   },
   {
     "fixture_id": "SYN-012",
     "data_origin": "synthetic",
     "benchmark_status": "development_only",
     "category": "student-affairs",
+    "user_profile": { "grade": "大一" },
     "text": "适用对象：大一学生\n1. 参加培训\n材料：学生证\n地点：B楼201",
     "expected": {
       "relevance": "relevant",
       "deadline": "unknown",
-      "materials": ["学生证"]
+      "materials": ["学生证"],
+      "evidence_spans": [
+        [10, 17],
+        [18, 24],
+        [25, 33],
+        [0, 9]
+      ]
     }
   },
   {
@@ -109,7 +208,16 @@
     "benchmark_status": "development_only",
     "category": "scholarship",
     "text": "适用对象：本科生\n仅限本学年无处分学生\n1. 提交奖学金材料\n截止：2099-09-13",
-    "expected": { "relevance": "relevant", "deadline": "explicit" }
+    "expected": {
+      "relevance": "relevant",
+      "deadline": "explicit",
+      "evidence_spans": [
+        [20, 30],
+        [9, 19],
+        [31, 44],
+        [0, 8]
+      ]
+    }
   },
   {
     "fixture_id": "SYN-014",
@@ -117,7 +225,16 @@
     "benchmark_status": "development_only",
     "category": "exam",
     "text": "适用对象：本科生\n1. 预约缓考\n截止：2099-09-14 16:00 前\n平台：教务系统",
-    "expected": { "relevance": "relevant", "deadline": "explicit" }
+    "expected": {
+      "relevance": "relevant",
+      "deadline": "explicit",
+      "evidence_spans": [
+        [9, 16],
+        [39, 46],
+        [17, 38],
+        [0, 8]
+      ]
+    }
   },
   {
     "fixture_id": "SYN-015",
@@ -125,7 +242,16 @@
     "benchmark_status": "development_only",
     "category": "competition",
     "text": "适用对象：创新项目成员\n1. 完成组队\n2. 提交计划书\n截止：2099-09-15 前",
-    "expected": { "relevance": "uncertain", "deadline": "explicit" }
+    "expected": {
+      "relevance": "uncertain",
+      "deadline": "explicit",
+      "action_count": 2,
+      "evidence_spans": [
+        [12, 19],
+        [29, 44],
+        [0, 11]
+      ]
+    }
   },
   {
     "fixture_id": "SYN-016",
@@ -133,7 +259,16 @@
     "benchmark_status": "development_only",
     "category": "club",
     "text": "适用对象：全体学生\n1. 报名志愿活动\n材料：报名表、证件复印件\n截止：2099-09-16",
-    "expected": { "relevance": "relevant", "deadline": "explicit" }
+    "expected": {
+      "relevance": "relevant",
+      "deadline": "explicit",
+      "evidence_spans": [
+        [10, 19],
+        [20, 32],
+        [33, 46],
+        [0, 9]
+      ]
+    }
   },
   {
     "fixture_id": "SYN-017",
@@ -141,15 +276,33 @@
     "benchmark_status": "development_only",
     "category": "employment",
     "text": "适用对象：应届毕业生\n1. 上传简历\n平台：就业平台\n截止：2099-09-17 20:00 前",
-    "expected": { "relevance": "uncertain", "deadline": "explicit" }
+    "expected": {
+      "relevance": "uncertain",
+      "deadline": "explicit",
+      "evidence_spans": [
+        [11, 18],
+        [19, 26],
+        [27, 48],
+        [0, 10]
+      ]
+    }
   },
   {
     "fixture_id": "SYN-018",
     "data_origin": "synthetic",
     "benchmark_status": "development_only",
     "category": "dormitory",
+    "user_profile": { "student_categories": ["住宿学生"] },
     "text": "适用对象：住宿学生\n1. 填写维修申请\n地点：宿管中心",
-    "expected": { "relevance": "relevant", "deadline": "unknown" }
+    "expected": {
+      "relevance": "relevant",
+      "deadline": "unknown",
+      "evidence_spans": [
+        [10, 19],
+        [20, 27],
+        [0, 9]
+      ]
+    }
   },
   {
     "fixture_id": "SYN-019",
@@ -157,7 +310,16 @@
     "benchmark_status": "development_only",
     "category": "public-service",
     "text": "适用对象：全体学生\n1. 领取校园卡\n地点：服务大厅\n截止：2099-09-19 17:30 前",
-    "expected": { "relevance": "relevant", "deadline": "explicit" }
+    "expected": {
+      "relevance": "relevant",
+      "deadline": "explicit",
+      "evidence_spans": [
+        [10, 18],
+        [19, 26],
+        [27, 48],
+        [0, 9]
+      ]
+    }
   },
   {
     "fixture_id": "SYN-020",
@@ -165,7 +327,15 @@
     "benchmark_status": "development_only",
     "category": "academic",
     "text": "适用对象：本科生\n1. 参加课程答疑\n时间：2099-09-20，具体时间另行通知",
-    "expected": { "relevance": "relevant", "deadline": "unknown" }
+    "expected": {
+      "relevance": "relevant",
+      "deadline": "unknown",
+      "evidence_spans": [
+        [9, 18],
+        [19, 41],
+        [0, 8]
+      ]
+    }
   },
   {
     "fixture_id": "SYN-021",
@@ -173,7 +343,15 @@
     "benchmark_status": "development_only",
     "category": "student-affairs",
     "text": "适用对象：研究生\n1. 更新培养计划\n截止：2099-09-21 10:00 前",
-    "expected": { "relevance": "uncertain", "deadline": "explicit" }
+    "expected": {
+      "relevance": "uncertain",
+      "deadline": "explicit",
+      "evidence_spans": [
+        [9, 18],
+        [19, 40],
+        [0, 8]
+      ]
+    }
   },
   {
     "fixture_id": "SYN-022",
@@ -181,7 +359,17 @@
     "benchmark_status": "development_only",
     "category": "scholarship",
     "text": "适用对象：本科生\n除交换生外\n1. 领取资助\n材料：银行卡信息\n截止：2099-09-22",
-    "expected": { "relevance": "relevant", "deadline": "explicit" }
+    "expected": {
+      "relevance": "relevant",
+      "deadline": "explicit",
+      "evidence_spans": [
+        [15, 22],
+        [23, 31],
+        [9, 14],
+        [32, 45],
+        [0, 8]
+      ]
+    }
   },
   {
     "fixture_id": "SYN-023",
@@ -189,7 +377,16 @@
     "benchmark_status": "development_only",
     "category": "exam",
     "text": "适用对象：本科生\n1. 下载准考证\n平台：考试系统\n截止：2099-09-23 08:00 前",
-    "expected": { "relevance": "relevant", "deadline": "explicit" }
+    "expected": {
+      "relevance": "relevant",
+      "deadline": "explicit",
+      "evidence_spans": [
+        [9, 17],
+        [18, 25],
+        [26, 47],
+        [0, 8]
+      ]
+    }
   },
   {
     "fixture_id": "SYN-024",
@@ -197,7 +394,16 @@
     "benchmark_status": "development_only",
     "category": "competition",
     "text": "适用对象：全体学生\n1. 观看说明会\n2. 提交报名\n时间尽快确认",
-    "expected": { "relevance": "relevant", "deadline": "unknown" }
+    "expected": {
+      "relevance": "relevant",
+      "deadline": "unknown",
+      "action_count": 2,
+      "evidence_spans": [
+        [10, 18],
+        [27, 33],
+        [0, 9]
+      ]
+    }
   },
   {
     "fixture_id": "SYN-025",
@@ -205,7 +411,16 @@
     "benchmark_status": "development_only",
     "category": "club",
     "text": "适用对象：摄影社成员\n1. 参加外拍\n地点：北门\n材料：相机",
-    "expected": { "relevance": "uncertain", "deadline": "unknown" }
+    "expected": {
+      "relevance": "uncertain",
+      "deadline": "unknown",
+      "evidence_spans": [
+        [11, 18],
+        [25, 30],
+        [19, 24],
+        [0, 10]
+      ]
+    }
   },
   {
     "fixture_id": "SYN-026",
@@ -213,15 +428,34 @@
     "benchmark_status": "development_only",
     "category": "employment",
     "text": "适用对象：毕业生\n1. 预约面试\n2. 现场签到\n截止：2099-09-26 14:00 前",
-    "expected": { "relevance": "uncertain", "deadline": "explicit" }
+    "expected": {
+      "relevance": "uncertain",
+      "deadline": "explicit",
+      "action_count": 2,
+      "evidence_spans": [
+        [9, 16],
+        [25, 46],
+        [0, 8]
+      ]
+    }
   },
   {
     "fixture_id": "SYN-027",
     "data_origin": "synthetic",
     "benchmark_status": "development_only",
     "category": "dormitory",
+    "user_profile": { "student_categories": ["住宿学生"] },
     "text": "适用对象：住宿学生\n1. 签署住宿承诺\n材料：承诺书、学生证\n截至：2099-09-27",
-    "expected": { "relevance": "relevant", "deadline": "explicit" }
+    "expected": {
+      "relevance": "relevant",
+      "deadline": "explicit",
+      "evidence_spans": [
+        [10, 19],
+        [20, 30],
+        [31, 44],
+        [0, 9]
+      ]
+    }
   },
   {
     "fixture_id": "SYN-028",
@@ -229,7 +463,16 @@
     "benchmark_status": "development_only",
     "category": "public-service",
     "text": "适用对象：全体学生\n1. 参加健康讲座\n线上平台：校园课堂\n日期待确认",
-    "expected": { "relevance": "relevant", "deadline": "unknown" }
+    "expected": {
+      "relevance": "relevant",
+      "deadline": "unknown",
+      "evidence_spans": [
+        [10, 19],
+        [20, 29],
+        [30, 35],
+        [0, 9]
+      ]
+    }
   },
   {
     "fixture_id": "SYN-029",
@@ -237,7 +480,16 @@
     "benchmark_status": "development_only",
     "category": "academic",
     "text": "适用对象：本科生\n1. 申请补考\n条件：课程成绩不及格\n截止：2099-09-29 12:00 前",
-    "expected": { "relevance": "relevant", "deadline": "explicit" }
+    "expected": {
+      "relevance": "relevant",
+      "deadline": "explicit",
+      "evidence_spans": [
+        [9, 16],
+        [17, 27],
+        [28, 49],
+        [0, 8]
+      ]
+    }
   },
   {
     "fixture_id": "SYN-030",
@@ -245,6 +497,15 @@
     "benchmark_status": "development_only",
     "category": "student-affairs",
     "text": "适用对象：全体学生\n1. 阅读通知\n若有问题请反馈\n截止日期冲突，以后续公告为准",
-    "expected": { "relevance": "relevant", "deadline": "unknown" }
+    "expected": {
+      "relevance": "relevant",
+      "deadline": "unknown",
+      "evidence_spans": [
+        [10, 17],
+        [18, 25],
+        [26, 40],
+        [0, 9]
+      ]
+    }
   }
 ]

@@ -220,3 +220,31 @@ test('rule parser preserves distinct deadlines for multi-stage actions', () => {
   assert.equal(result.verified_actions[1].deadline.evidence_ids.length, 1);
   assert.equal(validateTextParseResponse(result).ok, true);
 });
+
+test('rule parser matches audience fields instead of treating every student profile as relevant', () => {
+  const uncertain = parseText(request('适用对象：研究生\n1. 更新培养计划\n截止：2099-10-03 前'));
+  assert.equal('code' in uncertain, false);
+  if ('code' in uncertain) return;
+  assert.equal(uncertain.document_assessment.user_relevance, 'uncertain');
+  assert.equal(uncertain.verified_actions.length, 1);
+
+  const matched = parseText(
+    request('适用对象：社团成员\n1. 填写报名表\n线上平台：校园课堂', {
+      organization_memberships: ['社团成员'],
+    }),
+  );
+  assert.equal('code' in matched, false);
+  if ('code' in matched) return;
+  assert.equal(matched.document_assessment.user_relevance, 'relevant');
+  assert.equal(matched.verified_actions[0].platform?.value, '校园课堂');
+  assert.ok(matched.verified_actions[0].evidence.some((item) => item.field_name === 'platform'));
+});
+
+test('rule parser keeps ambiguous time lines as deadline evidence', () => {
+  const result = parseText(request('适用对象：本科生\n1. 参加说明会\n时间尽快确认'));
+  assert.equal('code' in result, false);
+  if ('code' in result) return;
+  assert.equal(result.verified_actions[0].deadline.value, null);
+  assert.ok(result.verified_actions[0].evidence.some((item) => item.field_name === 'deadline'));
+  assert.ok(result.warnings.some((warning) => warning.code === 'DEADLINE_AMBIGUOUS'));
+});

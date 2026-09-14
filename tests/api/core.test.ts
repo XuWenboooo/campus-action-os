@@ -865,6 +865,12 @@ test('API can route a controlled synthetic OCR result through the normal parse l
   const url = await listen(api.server);
   const headers = { 'content-type': 'application/json', 'x-dev-user-id': 'ocr-test-student' };
   try {
+    const profile = await fetch(`${url}/users/me/profile`, {
+      method: 'PATCH',
+      headers: { ...headers, 'idempotency-key': 'ocr-profile-1' },
+      body: JSON.stringify({ education_level: '本科生' }),
+    });
+    assert.equal(profile.status, 200);
     const documentResponse = await fetch(`${url}/documents`, {
       method: 'POST',
       headers: { ...headers, 'idempotency-key': 'ocr-success-doc-1' },
@@ -926,6 +932,12 @@ test('API persists binary media uploads and passes source bytes to a controlled 
     'base64',
   );
   try {
+    const profile = await fetch(`${url}/users/me/profile`, {
+      method: 'PATCH',
+      headers: { ...headers, 'idempotency-key': 'binary-profile-1' },
+      body: JSON.stringify({ education_level: '本科生' }),
+    });
+    assert.equal(profile.status, 200);
     const missingContent = await fetch(`${url}/documents/upload`, {
       method: 'POST',
       headers: { ...headers, 'idempotency-key': 'binary-missing-1' },

@@ -29,6 +29,39 @@ function lineFor(text: string, pattern: RegExp): string | undefined {
   return text.split('\n').find((line) => pattern.test(line.trim()));
 }
 
+function profileValues(profile: TextParseRequest['user_profile']): string[] {
+  return Object.values(profile).flatMap((value) =>
+    Array.isArray(value) ? value : typeof value === 'string' ? [value] : [],
+  );
+}
+
+function relevanceForAudience(
+  audience: string,
+  profile: TextParseRequest['user_profile'],
+): 'relevant' | 'irrelevant' | 'uncertain' {
+  const values = profileValues(profile);
+  const has = (pattern: RegExp) => values.some((value) => pattern.test(value));
+
+  if (/校外|访客|非本校/.test(audience)) return 'irrelevant';
+  if (/全体学生|所有学生|全体在校生/.test(audience)) return 'relevant';
+  if (/本科生|本科/.test(audience)) return has(/本科/) ? 'relevant' : 'uncertain';
+  if (/研究生|硕士|博士/.test(audience)) return has(/研究生|硕士|博士/) ? 'relevant' : 'uncertain';
+  if (/大一|大二|大三|大四/.test(audience))
+    return has(new RegExp(audience.match(/大[一二三四]/)?.[0] ?? '大[一二三四]'))
+      ? 'relevant'
+      : 'uncertain';
+
+  const normalizedAudience = audience.replace(/^(仅限|面向)\s*/, '').trim();
+  if (
+    values.some(
+      (value) => value.includes(normalizedAudience) || normalizedAudience.includes(value.trim()),
+    )
+  )
+    return 'relevant';
+
+  return 'uncertain';
+}
+
 function claim(
   value: string | null,
   epistemicStatus: Claim['epistemic_status'],
@@ -120,30 +153,22 @@ export function parseText(request: TextParseRequest): TextParseResponse | Parser
   const audienceLine = lineFor(source, /适用对象|面向|仅限|本科生|研究生|全体学生/);
   const audience =
     audienceLine?.replace(/^(适用对象|面向)[:：]?\s*/, '').trim() || '未明确适用对象';
-  const profileText = Object.values(request.user_profile).flat().join(' ');
-  const hasExclusion = /不包括|除.*外|不适用于|仅限/.test(source);
-  const knownAudience = /全体学生|本科生|研究生|大一学生|毕业生|应届毕业生|住宿学生/.test(audience);
-  const audienceMatches =
-    /全体|所有|学生|本科生|研究生/.test(audience) &&
-    (profileText.length === 0 || /本科|undergraduate|student|学生/.test(profileText));
   const userRelevance =
     audience === '未明确适用对象'
       ? 'uncertain'
-      : audienceMatches
-        ? 'relevant'
-        : hasExclusion || !knownAudience
-          ? 'uncertain'
-          : 'irrelevant';
+      : relevanceForAudience(audience, request.user_profile);
   const relevanceEvidence = audienceLine
     ? evidence('ev-relevance', audienceLine, 'user_relevance')
     : undefined;
   const actionInputs = findActions(lines);
-  const deadlineLines = lines.filter((line) => /截止|截至|前完成|报名时间|20\d{2}[-年]/.test(line));
+  const deadlineLines = lines.filter((line) =>
+    /^(?:截止|截至|报名时间|时间|日期)|20\d{2}[-年]/.test(line),
+  );
   const materialsLine =
     lineFor(source, /^(?:材料|材料清单|需准备|需携带|携带)[:：]/) ??
     lineFor(source, /^提交.*(?:证件|证明|附件)/);
   const locationLine = lineFor(source, /^(?:地点|地址|教室|现场)[:：]/);
-  const platformLine = lineFor(source, /^(?:平台|系统|线上|邮箱|链接|网址)[:：]/);
+  const platformLine = lineFor(source, /^(?:平台|系统|线上平台|在线平台|线上|邮箱|链接|网址)[:：]/);
   const conditionLine = lineFor(source, /^(?:条件|要求|仅限|须知|须满足|如果|若)/);
   const exceptionLine = lineFor(source, /^(?:除.*外|不适用于|例外)/);
   const actionDeadlineLines = actionInputs.map(({ line }, index) =>

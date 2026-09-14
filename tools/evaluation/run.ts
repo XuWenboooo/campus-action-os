@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { type TextParseRequest } from '@campus-action-os/protocol';
+import { type TextParseRequest, type UserProfile } from '@campus-action-os/protocol';
 import { inspectCriticalErrors } from '../../services/ai-parser/src/error-shield.js';
 import { parseText, type ParserFailure } from '../../services/ai-parser/src/rule-parser.js';
 import { scoreRecords, type EvaluationRecord } from './metrics.js';
@@ -12,9 +12,11 @@ type Fixture = {
   data_origin: string;
   benchmark_status: string;
   text: string;
+  user_profile?: UserProfile;
   expected: {
     relevance: 'relevant' | 'irrelevant' | 'uncertain';
     deadline: 'explicit' | 'unknown';
+    action_count?: number;
     materials?: string[];
     evidence_spans?: Array<[number, number]>;
   };
@@ -27,10 +29,16 @@ const fixtures = JSON.parse(
 
 function evidenceSpans(text: string, sourceTexts: string[]): Array<[number, number]> {
   const spans: Array<[number, number]> = [];
+  const seen = new Set<string>();
   for (const sourceText of sourceTexts) {
     let start = text.indexOf(sourceText);
     while (start >= 0) {
-      spans.push([start, start + sourceText.length]);
+      const span: [number, number] = [start, start + sourceText.length];
+      const key = `${span[0]}:${span[1]}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        spans.push(span);
+      }
       start = text.indexOf(sourceText, start + 1);
     }
   }
@@ -55,7 +63,7 @@ for (const fixture of fixtures) {
       language: 'zh-CN',
       timezone: 'Asia/Shanghai',
     },
-    user_profile: { education_level: '本科生' },
+    user_profile: fixture.user_profile ?? { education_level: '本科生' },
     execution_context: {
       environment: 'test',
       deadline_ms: 5000,
@@ -72,7 +80,7 @@ for (const fixture of fixtures) {
   const errorCodes = failure ? [failure.code] : warningCodes;
   records.push({
     sample_id: fixture.fixture_id,
-    expected_action_count: 1,
+    expected_action_count: fixture.expected.action_count ?? 1,
     predicted_action_count: parsed?.verified_actions.length ?? 0,
     expected_deadline: fixture.expected.deadline,
     predicted_deadline: failed ? 'failed' : action?.deadline.value ? 'explicit' : 'unknown',
@@ -99,6 +107,7 @@ for (const fixture of fixtures) {
   raw.push({
     fixture_id: fixture.fixture_id,
     data_origin: fixture.data_origin,
+    user_profile: request.user_profile,
     result,
     shield_errors: shieldErrors,
   });

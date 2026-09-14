@@ -131,6 +131,32 @@ test('API closes the document → parse job → verified action → confirmed ta
     assert.equal(parsed.parsed.status, 'succeeded');
     assert.equal(parsed.parsed.result.verified_actions.length, 2);
     assert.equal(parsed.parsed.result.action_graph.edges.length, 1);
+    assert.equal(
+      (
+        repository.db.prepare('SELECT count(*) AS count FROM action_steps').get() as {
+          count: number;
+        }
+      ).count,
+      2,
+    );
+    assert.equal(
+      (
+        repository.db.prepare('SELECT count(*) AS count FROM action_dependencies').get() as {
+          count: number;
+        }
+      ).count,
+      0,
+    );
+    assert.equal(
+      (repository.db.prepare('SELECT count(*) AS count FROM deadlines').get() as { count: number })
+        .count,
+      2,
+    );
+    assert.equal(
+      (repository.db.prepare('SELECT count(*) AS count FROM materials').get() as { count: number })
+        .count,
+      4,
+    );
     const parseConflict = await call(
       'POST',
       `/documents/${documentId}/parse`,

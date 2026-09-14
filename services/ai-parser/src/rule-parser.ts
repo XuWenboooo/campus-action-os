@@ -139,11 +139,13 @@ export function parseText(request: TextParseRequest): TextParseResponse | Parser
     : undefined;
   const actionInputs = findActions(lines);
   const deadlineLines = lines.filter((line) => /截止|截至|前完成|报名时间|20\d{2}[-年]/.test(line));
-  const materialsLine = lineFor(source, /材料|携带|提交.*(证件|证明|附件)/);
-  const locationLine = lineFor(source, /地点|地址|教室|现场/);
-  const platformLine = lineFor(source, /平台|系统|线上|邮箱|链接|网址/);
-  const conditionLine = lineFor(source, /条件|要求|仅限|须知|须满足|如果|若/);
-  const exceptionLine = lineFor(source, /除.*外|不适用于|例外/);
+  const materialsLine =
+    lineFor(source, /^(?:材料|材料清单|需准备|需携带|携带)[:：]/) ??
+    lineFor(source, /^提交.*(?:证件|证明|附件)/);
+  const locationLine = lineFor(source, /^(?:地点|地址|教室|现场)[:：]/);
+  const platformLine = lineFor(source, /^(?:平台|系统|线上|邮箱|链接|网址)[:：]/);
+  const conditionLine = lineFor(source, /^(?:条件|要求|仅限|须知|须满足|如果|若)/);
+  const exceptionLine = lineFor(source, /^(?:除.*外|不适用于|例外)/);
   const actionDeadlineLines = actionInputs.map(({ line }, index) =>
     deadlineLineForAction(line, index, deadlineLines),
   );

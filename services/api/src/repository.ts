@@ -96,6 +96,77 @@ function insertActionChanges(db: DatabaseSync, action: VerifiedActionObject): vo
   }
 }
 
+function replaceActionProjections(db: DatabaseSync, action: VerifiedActionObject): void {
+  db.prepare('DELETE FROM materials WHERE action_id = ?').run(action.action_id);
+  db.prepare('DELETE FROM action_dependencies WHERE action_id = ?').run(action.action_id);
+  db.prepare('DELETE FROM deadlines WHERE action_id = ?').run(action.action_id);
+  db.prepare('DELETE FROM action_steps WHERE action_id = ?').run(action.action_id);
+
+  const stepStatement = db.prepare(
+    'INSERT INTO action_steps (action_id, step_id, instruction, location_json, platform_json, epistemic_status, position) VALUES (?, ?, ?, ?, ?, ?, ?)',
+  );
+  for (const [position, step] of action.steps.entries())
+    stepStatement.run(
+      action.action_id,
+      step.step_id,
+      step.instruction,
+      step.location ? json(step.location) : null,
+      step.platform ? json(step.platform) : null,
+      step.epistemic_status,
+      position,
+    );
+
+  const dependencyStatement = db.prepare(
+    'INSERT INTO action_dependencies (action_id, dependency_id, from_step_id, to_step_id, dependency_type, condition_id) VALUES (?, ?, ?, ?, ?, ?)',
+  );
+  for (const dependency of action.dependencies)
+    dependencyStatement.run(
+      action.action_id,
+      dependency.dependency_id,
+      dependency.from_step_id,
+      dependency.to_step_id,
+      dependency.type,
+      dependency.condition_id ?? null,
+    );
+
+  db.prepare(
+    'INSERT INTO deadlines (action_id, value, precision, boundary_semantics, timezone, epistemic_status, evidence_ids_json) VALUES (?, ?, ?, ?, ?, ?, ?)',
+  ).run(
+    action.action_id,
+    action.deadline.value,
+    action.deadline.precision,
+    action.deadline.boundary_semantics,
+    action.deadline.timezone ?? null,
+    action.deadline.epistemic_status,
+    json(action.deadline.evidence_ids),
+  );
+
+  const materialStatement = db.prepare(
+    'INSERT INTO materials (material_record_id, material_id, action_id, step_id, description, epistemic_status, position) VALUES (?, ?, ?, ?, ?, ?, ?)',
+  );
+  for (const [position, material] of action.required_materials.entries())
+    materialStatement.run(
+      `${action.action_id}:action-material:${position}`,
+      material.material_id,
+      action.action_id,
+      null,
+      material.description,
+      material.epistemic_status,
+      position,
+    );
+  for (const step of action.steps)
+    for (const [position, material] of (step.required_materials ?? []).entries())
+      materialStatement.run(
+        `${action.action_id}:step-material:${step.step_id}:${position}`,
+        material.material_id,
+        action.action_id,
+        step.step_id,
+        material.description,
+        material.epistemic_status,
+        position,
+      );
+}
+
 function normalizedError(value: unknown, requestId: string): ApiError['error'] {
   const candidate =
     typeof value === 'object' && value !== null && 'error' in value
@@ -616,6 +687,7 @@ export class Repository {
             timestamp,
             timestamp,
           );
+        replaceActionProjections(this.db, valid.value);
         this.db.prepare('DELETE FROM evidence WHERE action_id = ?').run(action.action_id);
         for (const evidence of action.evidence) {
           this.db
@@ -823,6 +895,7 @@ export class Repository {
           action.action_id,
           userId,
         );
+      replaceActionProjections(this.db, action);
       insertActionChanges(this.db, action);
       const activeTasks = this.db
         .prepare(

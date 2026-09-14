@@ -43,7 +43,16 @@ test('rule parser emits evidence-backed actions and an executable dependency gra
   assert.equal(result.status, 'succeeded');
   assert.equal(result.verified_actions.length, 2);
   assert.equal(result.action_graph?.edges.length, 1);
-  assert.ok(result.verified_actions[0].evidence.some((item) => item.field_name === 'deadline'));
+  const action = result.verified_actions[0];
+  assert.ok(action.evidence.some((item) => item.field_name === 'deadline'));
+  assert.deepEqual(
+    action.required_materials.map((material) => material.description),
+    ['学生证', '成绩单'],
+  );
+  assert.equal(action.location?.value, 'A楼101');
+  assert.equal(action.platform?.value, 'https://example.invalid/apply');
+  assert.equal(action.evidence.filter((item) => item.field_name === 'location').length, 1);
+  assert.equal(action.evidence.filter((item) => item.field_name === 'platform').length, 1);
   assert.equal(validateTextParseResponse(result).ok, true);
   assert.equal(inspectCriticalErrors(result.verified_actions[0]).length, 0);
 });

@@ -34,5 +34,6 @@
 - 收紧 Action/Task 状态机边界：已完成 Task 对应的 Action 不得再次拒绝；Action PATCH 只同步本次明确修改的标题/截止时间，保留用户对 Task 截止时间的独立覆盖，并加入 API 回归断言。
 - 补齐解析请求幂等一致性：新增 SQLite 迁移保存 ParseJob 的内部 `request_hash`，同一用户/文档/key 携带不同解析请求体时统一返回 `IDEMPOTENCY_CONFLICT`，并加入 API 回归测试。
 - 为开发登录角色 provision 增加 scoped 幂等：同一 key 重放不重复写角色审计，修改请求体统一返回 `IDEMPOTENCY_CONFLICT`，并覆盖 API 回归测试。
+- 补齐 Action 归一化投影：新增 `action_steps`、`action_dependencies`、`deadlines`、`materials` 迁移，并在解析落库与 Action 编辑事务中同步替换；API 验证这些投影真实写入 SQLite。
 
 仍为 `NOT_READY`：真实 OCR/provider、正式 800 条冻结评测、微信开发者工具人工验证、真实认证/提醒和生产部署均缺失；本地测试不能替代这些证据。

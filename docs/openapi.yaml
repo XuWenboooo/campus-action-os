@@ -148,6 +148,12 @@ components:
               title: { type: string, minLength: 1 }
               status: { enum: [pending, in_progress, completed, expired, cancelled] }
               due_at: { anyOf: [{ type: string }, { type: 'null' }] }
+              confirmed:
+                {
+                  type: boolean,
+                  const: true,
+                  description: Required when changing status to completed or cancelled,
+                }
     ManualTaskInput:
       required: true
       content:

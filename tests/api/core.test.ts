@@ -66,6 +66,14 @@ test('API closes the document → parse job → verified action → confirmed ta
     );
     assert.equal(profileConflict.result.status, 409);
     assert.equal(profileConflict.parsed.error.code, 'IDEMPOTENCY_CONFLICT');
+    const unknownProfileField = await call(
+      'PATCH',
+      '/users/me/profile',
+      { student_id: 'must-not-be-accepted' },
+      { 'idempotency-key': 'profile-unknown-field-1' },
+    );
+    assert.equal(unknownProfileField.result.status, 400);
+    assert.equal(unknownProfileField.parsed.error.code, 'INVALID_REQUEST');
     assert.equal(
       (
         repository.db
@@ -90,6 +98,24 @@ test('API closes the document → parse job → verified action → confirmed ta
     assert.equal(invalidOrigin.parsed.error.code, 'INVALID_REQUEST');
     assert.equal(invalidOrigin.parsed.error.requestId, 'origin-request-1');
     assert.equal(invalidOrigin.result.headers.get('x-request-id'), 'origin-request-1');
+    assert.equal(
+      (repository.db.prepare('SELECT count(*) AS count FROM documents').get() as { count: number })
+        .count,
+      0,
+    );
+    const unknownDocumentField = await call(
+      'POST',
+      '/documents',
+      {
+        title: '未知字段',
+        text: '适用对象：本科生\n1. 提交材料',
+        data_origin: 'synthetic',
+        unexpected: true,
+      },
+      { 'idempotency-key': 'unknown-document-field-1' },
+    );
+    assert.equal(unknownDocumentField.result.status, 400);
+    assert.equal(unknownDocumentField.parsed.error.code, 'INVALID_REQUEST');
     assert.equal(
       (repository.db.prepare('SELECT count(*) AS count FROM documents').get() as { count: number })
         .count,
@@ -162,7 +188,7 @@ test('API closes the document → parse job → verified action → confirmed ta
     const parseConflict = await call(
       'POST',
       `/documents/${documentId}/parse`,
-      { rerun: true },
+      { idempotencyKey: 'different-body' },
       { 'idempotency-key': 'parse-loop-1' },
     );
     assert.equal(parseConflict.result.status, 409);
@@ -308,6 +334,14 @@ test('API closes the document → parse job → verified action → confirmed ta
     );
     assert.equal(missingCompleteConfirmation.result.status, 400);
     assert.equal(missingCompleteConfirmation.parsed.error.code, 'CONFIRMATION_REQUIRED');
+    const patchCompleteWithoutConfirmation = await call(
+      'PATCH',
+      `/tasks/${task.parsed.task.task_id}`,
+      { status: 'completed' },
+      { 'idempotency-key': 'task-patch-complete-missing-1' },
+    );
+    assert.equal(patchCompleteWithoutConfirmation.result.status, 400);
+    assert.equal(patchCompleteWithoutConfirmation.parsed.error.code, 'CONFIRMATION_REQUIRED');
     const completed = await call(
       'POST',
       `/tasks/${task.parsed.task.task_id}/complete`,
@@ -370,7 +404,7 @@ test('API closes the document → parse job → verified action → confirmed ta
     const deletedConflict = await call(
       'DELETE',
       `/documents/${documentId}`,
-      { confirmed: true, reason: 'different request' },
+      { confirmed: false },
       { 'idempotency-key': 'document-delete-1' },
     );
     assert.equal(deletedConflict.result.status, 409);

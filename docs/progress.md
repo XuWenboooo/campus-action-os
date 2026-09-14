@@ -36,5 +36,8 @@
 - 为开发登录角色 provision 增加 scoped 幂等：同一 key 重放不重复写角色审计，修改请求体统一返回 `IDEMPOTENCY_CONFLICT`，并覆盖 API 回归测试。
 - 补齐 Action 归一化投影：新增 `action_steps`、`action_dependencies`、`deadlines`、`materials` 迁移，并在解析落库与 Action 编辑事务中同步替换；API 验证这些投影真实写入 SQLite。
 - 加强 Evidence 对齐：共享协议新增“证据原文必须出现在标准化文档文本中”的运行时校验，规则 Parser 与 API 均执行，结构合法但伪造原文的响应进入 `PARSER_RESPONSE_INVALID`，并加入协议/API 失败测试。
+- 修复规则 Parser 的画像匹配：本科/研究生、年级、学生类别和组织成员关系按对应字段判断，缺少关键画像时保持 `uncertain`；同时保留“时间尽快确认/日期待确认”和“线上平台”原文证据。
+- 为 30 条 development-only synthetic 夹具显式补充特殊画像、行动数量和首行动 Evidence Span 标注；评估器去重重复证据跨度，并增加跨度边界元数据校验。
+- 收紧 API 请求体契约：各写入路由拒绝未知字段；任务 PATCH 将 `completed/cancelled` 状态变更纳入显式确认边界，并补充 API 回归测试与 OpenAPI 说明。
 
 仍为 `NOT_READY`：真实 OCR/provider、正式 800 条冻结评测、微信开发者工具人工验证、真实认证/提醒和生产部署均缺失；本地测试不能替代这些证据。

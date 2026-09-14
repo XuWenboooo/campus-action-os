@@ -44,6 +44,16 @@ function bodyObject(input: unknown): Body {
   return input as Body;
 }
 
+function assertAllowedFields(body: Body, allowed: readonly string[]): void {
+  const unknown = Object.keys(body).filter((key) => !allowed.includes(key));
+  if (unknown.length > 0)
+    throw new RepositoryError(
+      'INVALID_REQUEST',
+      400,
+      `Unknown request field(s): ${unknown.join(', ')}`,
+    );
+}
+
 async function readJson(request: IncomingMessage): Promise<unknown> {
   const chunks: Buffer[] = [];
   let length = 0;
@@ -322,6 +332,7 @@ async function handle(
     return;
   }
   if (request.method === 'POST' && path === '/auth/dev-login') {
+    assertAllowedFields(body, ['userId', 'role', 'idempotencyKey']);
     if ((options.environment ?? process.env.APP_ENV ?? 'local') === 'production')
       throw new RepositoryError(
         'DEV_LOGIN_DISABLED',
@@ -373,6 +384,16 @@ async function handle(
     return;
   }
   if (request.method === 'PATCH' && path === '/users/me/profile') {
+    assertAllowedFields(body, [
+      'education_level',
+      'grade',
+      'college',
+      'major',
+      'campus',
+      'student_categories',
+      'organization_memberships',
+      'idempotencyKey',
+    ]);
     const key = idempotencyKey(request, body);
     const hash = requestHash(body);
     const previous = repository.getIdempotency(userId, path, key, hash);
@@ -406,6 +427,12 @@ async function handle(
   }
 
   if (request.method === 'POST' && (path === '/documents' || path === '/documents/upload')) {
+    assertAllowedFields(
+      body,
+      path === '/documents'
+        ? ['title', 'contentType', 'text', 'data_origin', 'idempotencyKey']
+        : ['title', 'contentType', 'text', 'content_base64', 'data_origin', 'idempotencyKey'],
+    );
     const key = idempotencyKey(request, body);
     const hash = requestHash(body);
     const previous = repository.getIdempotency(userId, path, key, hash);
@@ -468,6 +495,7 @@ async function handle(
     request.method === 'DELETE' &&
     segments.length === 2
   ) {
+    assertAllowedFields(body, ['confirmed', 'idempotencyKey']);
     const key = idempotencyKey(request, body);
     const hash = requestHash(body);
     const previous = repository.getIdempotency(userId, path, key, hash);
@@ -510,6 +538,7 @@ async function handle(
     segments[2] === 'parse' &&
     request.method === 'POST'
   ) {
+    assertAllowedFields(body, ['idempotencyKey']);
     const key = idempotencyKey(request, body);
     const document = repository.getDocument(userId, segments[1]);
     if (!document) throw new RepositoryError('DOCUMENT_NOT_FOUND', 404, 'Document not found');
@@ -546,6 +575,7 @@ async function handle(
     request.method === 'POST' &&
     segments[2] === 'confirm'
   ) {
+    assertAllowedFields(body, ['confirmed', 'idempotencyKey']);
     const key = idempotencyKey(request, body);
     const hash = requestHash(body);
     const previous = repository.getIdempotency(userId, path, key, hash);
@@ -572,6 +602,7 @@ async function handle(
     request.method === 'POST' &&
     segments[2] === 'reject'
   ) {
+    assertAllowedFields(body, ['rejected', 'idempotencyKey']);
     const key = idempotencyKey(request, body);
     const hash = requestHash(body);
     const previous = repository.getIdempotency(userId, path, key, hash);
@@ -604,6 +635,13 @@ async function handle(
     return;
   }
   if (segments[0] === 'actions' && segments[1] && request.method === 'PATCH') {
+    assertAllowedFields(body, [
+      'title',
+      'summary',
+      'deadline',
+      'required_materials',
+      'idempotencyKey',
+    ]);
     const key = idempotencyKey(request, body);
     const hash = requestHash(body);
     const previous = repository.getIdempotency(userId, path, key, hash);
@@ -649,6 +687,7 @@ async function handle(
   }
 
   if (request.method === 'POST' && path === '/tasks') {
+    assertAllowedFields(body, ['actionId', 'title', 'idempotencyKey']);
     const key = idempotencyKey(request, body);
     const hash = requestHash(body);
     const previous = repository.getIdempotency(userId, path, key, hash);
@@ -675,6 +714,7 @@ async function handle(
     return;
   }
   if (request.method === 'POST' && path === '/tasks/manual') {
+    assertAllowedFields(body, ['documentId', 'title', 'due_at', 'confirmed', 'idempotencyKey']);
     const key = idempotencyKey(request, body);
     const hash = requestHash(body);
     const previous = repository.getIdempotency(userId, path, key, hash);
@@ -725,6 +765,7 @@ async function handle(
     segments[2] === 'notices' &&
     request.method === 'POST'
   ) {
+    assertAllowedFields(body, ['noticeId', 'confirmed', 'idempotencyKey']);
     const key = idempotencyKey(request, body);
     const hash = requestHash(body);
     const previous = repository.getIdempotency(userId, path, key, hash);
@@ -772,6 +813,7 @@ async function handle(
     segments[4] === 'resolve' &&
     request.method === 'POST'
   ) {
+    assertAllowedFields(body, ['decision', 'confirmed', 'idempotencyKey']);
     const key = idempotencyKey(request, body);
     const hash = requestHash(body);
     const previous = repository.getIdempotency(userId, path, key, hash);
@@ -811,6 +853,7 @@ async function handle(
     request.method === 'PATCH' &&
     segments.length === 2
   ) {
+    assertAllowedFields(body, ['title', 'status', 'due_at', 'confirmed', 'idempotencyKey']);
     const key = idempotencyKey(request, body);
     const hash = requestHash(body);
     const previous = repository.getIdempotency(userId, path, key, hash);
@@ -835,6 +878,12 @@ async function handle(
         )
       )
         throw new RepositoryError('INVALID_REQUEST', 400, 'status is not a valid task status');
+      if (['completed', 'cancelled'].includes(body.status as string) && body.confirmed !== true)
+        throw new RepositoryError(
+          'CONFIRMATION_REQUIRED',
+          400,
+          'Completing or cancelling a task requires explicit confirmation',
+        );
     }
     if (hasField('due_at') && body.due_at !== null) {
       if (typeof body.due_at !== 'string' || body.due_at.trim().length === 0)
@@ -862,6 +911,7 @@ async function handle(
     request.method === 'POST' &&
     segments[2] === 'complete'
   ) {
+    assertAllowedFields(body, ['confirmed', 'idempotencyKey']);
     const key = idempotencyKey(request, body);
     const hash = requestHash(body);
     const previous = repository.getIdempotency(userId, path, key, hash);
@@ -890,6 +940,7 @@ async function handle(
   }
 
   if (request.method === 'POST' && path === '/notices') {
+    assertAllowedFields(body, ['title', 'body', 'idempotencyKey']);
     const key = idempotencyKey(request, body);
     const hash = requestHash(body);
     const previous = repository.getIdempotency(userId, path, key, hash);
@@ -927,6 +978,7 @@ async function handle(
     segments[2] === 'publish' &&
     request.method === 'POST'
   ) {
+    assertAllowedFields(body, ['confirmed', 'idempotencyKey']);
     const key = idempotencyKey(request, body);
     const hash = requestHash(body);
     const previous = repository.getIdempotency(userId, path, key, hash);
@@ -953,6 +1005,7 @@ async function handle(
     segments[2] === 'revisions' &&
     request.method === 'POST'
   ) {
+    assertAllowedFields(body, ['title', 'body', 'status', 'confirmed', 'idempotencyKey']);
     const key = idempotencyKey(request, body);
     const hash = requestHash(body);
     const previous = repository.getIdempotency(userId, path, key, hash);
@@ -1004,6 +1057,7 @@ async function handle(
     return;
   }
   if (request.method === 'POST' && path === '/feedback') {
+    assertAllowedFields(body, ['actionId', 'kind', 'message', 'idempotencyKey']);
     const key = idempotencyKey(request, body);
     const hash = requestHash(body);
     const previous = repository.getIdempotency(userId, path, key, hash);

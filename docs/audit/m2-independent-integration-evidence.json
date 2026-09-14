@@ -1,0 +1,38 @@
+{
+  "runbook": "CAOS-M2-INDEPENDENT-INTEGRATION-FLOW-v1.0",
+  "baseline": "m2-text-contract-v0.1.0@d89afe123ba38368b9ee2fdeb4049243107fde84",
+  "development_only": true,
+  "synthetic": true,
+  "not_model_output": true,
+  "status": "PASS",
+  "passed": 9,
+  "failed": 0,
+  "scenarios": [
+    "normal-review-confirmation",
+    "irrelevant-no-task",
+    "partial-warning-confirmation",
+    "needs-confirmation-explicit-choice",
+    "invalid-response-quarantine",
+    "timeout-retryable",
+    "idempotent-replay",
+    "idempotency-key-reuse-rejected",
+    "unmatched-rejected"
+  ],
+  "local_commands": [
+    "npm ci",
+    "npm run format:check",
+    "npm run lint",
+    "npm run typecheck",
+    "npm run test",
+    "npm run test:m2",
+    "npm run acceptance:m2",
+    "npm run build",
+    "npm run test:built",
+    "npm run scan:secrets",
+    "npm run test:python",
+    "npm run check"
+  ],
+  "remote_ci": {
+    "status": "PENDING_FINAL_PUSH"
+  }
+}

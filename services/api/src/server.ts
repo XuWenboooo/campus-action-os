@@ -458,6 +458,19 @@ async function handle(
     request.method === 'DELETE' &&
     segments.length === 2
   ) {
+    const key = idempotencyKey(request, body);
+    const hash = requestHash(body);
+    const previous = repository.getIdempotency(userId, path, key, hash);
+    if (previous === 'conflict')
+      throw new RepositoryError(
+        'IDEMPOTENCY_CONFLICT',
+        409,
+        'Idempotency key was reused with a different request',
+      );
+    if (previous) {
+      send(response, previous.status, previous.body, requestId);
+      return;
+    }
     if (body.confirmed !== true)
       throw new RepositoryError(
         'CONFIRMATION_REQUIRED',
@@ -466,6 +479,7 @@ async function handle(
       );
     if (!repository.deleteDocument(userId, segments[1]))
       throw new RepositoryError('DOCUMENT_NOT_FOUND', 404, 'Document not found');
+    repository.saveIdempotency(userId, path, key, hash, 204, null);
     send(response, 204, null, requestId);
     return;
   }

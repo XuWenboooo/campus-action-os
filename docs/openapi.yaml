@@ -238,6 +238,7 @@ paths:
         { '200': { description: Document }, '404': { $ref: '#/components/responses/NotFound' } }
     delete:
       security: [{ devUser: [] }]
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
       requestBody: { $ref: '#/components/requestBodies/Confirmation' }
       responses:
         { '204': { description: Deleted }, '404': { $ref: '#/components/responses/NotFound' } }

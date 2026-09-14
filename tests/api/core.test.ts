@@ -285,11 +285,33 @@ test('API closes the document → parse job → verified action → confirmed ta
     assert.equal(unknown.result.status, 404);
     assert.equal(unknown.result.headers.get('x-request-id'), 'client-request-1');
     assert.equal(unknown.parsed.error.requestId, 'client-request-1');
-    const deleteMissingConfirmation = await call('DELETE', `/documents/${documentId}`);
+    const deleteMissingConfirmation = await call('DELETE', `/documents/${documentId}`, undefined, {
+      'idempotency-key': 'document-delete-missing-1',
+    });
     assert.equal(deleteMissingConfirmation.result.status, 400);
     assert.equal(deleteMissingConfirmation.parsed.error.code, 'CONFIRMATION_REQUIRED');
-    const deleted = await call('DELETE', `/documents/${documentId}`, { confirmed: true });
+    const deleted = await call(
+      'DELETE',
+      `/documents/${documentId}`,
+      { confirmed: true },
+      { 'idempotency-key': 'document-delete-1' },
+    );
     assert.equal(deleted.result.status, 204);
+    const deletedReplay = await call(
+      'DELETE',
+      `/documents/${documentId}`,
+      { confirmed: true },
+      { 'idempotency-key': 'document-delete-1' },
+    );
+    assert.equal(deletedReplay.result.status, 204);
+    const deletedConflict = await call(
+      'DELETE',
+      `/documents/${documentId}`,
+      { confirmed: true, reason: 'different request' },
+      { 'idempotency-key': 'document-delete-1' },
+    );
+    assert.equal(deletedConflict.result.status, 409);
+    assert.equal(deletedConflict.parsed.error.code, 'IDEMPOTENCY_CONFLICT');
     const deletedRead = await call('GET', `/documents/${documentId}`);
     assert.equal(deletedRead.result.status, 404);
   } finally {

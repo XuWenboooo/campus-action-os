@@ -1,16 +1,17 @@
 import type { Document } from '@campus-action-os/protocol';
+import { type OcrProvider, unconfiguredOcrProvider } from './ocr.js';
 import { sha256 } from './rule-parser.js';
 
 export type NormalizationSuccess = {
   ok: true;
   text: string;
   content_sha256: string;
-  source: 'direct_text' | 'html_text';
+  source: 'direct_text' | 'html_text' | 'ocr';
 };
 
 export type NormalizationFailure = {
   ok: false;
-  code: 'OCR_NOT_CONFIGURED' | 'EMPTY_TEXT';
+  code: 'OCR_NOT_CONFIGURED' | 'NOT_RUN_CREDENTIALS_REQUIRED' | 'OCR_FAILED' | 'EMPTY_TEXT';
   message: string;
 };
 
@@ -39,15 +40,36 @@ function htmlToText(html: string): string {
     .replace(/&quot;/gi, '"');
 }
 
-export function normalizeDocument(document: Document): NormalizationResult {
+export async function normalizeDocument(
+  document: Document,
+  ocrProvider: OcrProvider = unconfiguredOcrProvider,
+): Promise<NormalizationResult> {
+  let source: string;
+  let sourceType: NormalizationSuccess['source'];
   if (document.content_type === 'image/png' || document.content_type === 'application/pdf') {
-    return {
-      ok: false,
-      code: 'OCR_NOT_CONFIGURED',
-      message: '图片/PDF 需要经过已配置并可审计的 OCR/版面解析器；当前环境未启用该能力',
-    };
+    let extraction;
+    try {
+      extraction = await ocrProvider.extract({
+        document_id: document.document_id,
+        content_type: document.content_type,
+        content_sha256: document.content_sha256,
+        data_origin: document.data_origin,
+      });
+    } catch {
+      return {
+        ok: false,
+        code: 'OCR_FAILED',
+        message: `OCR provider ${ocrProvider.name} failed without a usable result`,
+      };
+    }
+    if (extraction.status !== 'succeeded')
+      return { ok: false, code: extraction.code, message: extraction.message };
+    source = extraction.text;
+    sourceType = 'ocr';
+  } else {
+    source = document.content_type === 'text/html' ? htmlToText(document.text) : document.text;
+    sourceType = document.content_type === 'text/html' ? 'html_text' : 'direct_text';
   }
-  const source = document.content_type === 'text/html' ? htmlToText(document.text) : document.text;
   const text = normalizeWhitespace(source);
   if (!text)
     return {
@@ -59,6 +81,6 @@ export function normalizeDocument(document: Document): NormalizationResult {
     ok: true,
     text,
     content_sha256: sha256(text),
-    source: document.content_type === 'text/html' ? 'html_text' : 'direct_text',
+    source: sourceType,
   };
 }

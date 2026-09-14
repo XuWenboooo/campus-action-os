@@ -312,6 +312,58 @@ test('API persists an explicit OCR degradation for image input', async () => {
   }
 });
 
+test('API can route a controlled synthetic OCR result through the normal parse loop', async () => {
+  const ai = createParserServer();
+  const aiUrl = await listen(ai);
+  const repository = new Repository(':memory:');
+  const api = createApiServer({
+    repository,
+    parserUrl: aiUrl,
+    ocrProvider: {
+      name: 'synthetic-ocr-test-only',
+      async extract() {
+        return {
+          status: 'succeeded' as const,
+          text: '适用对象：本科生\n1. 上传截图要求的材料\n截止：2099-10-03 17:00 前',
+          provider: 'synthetic-ocr-test-only',
+          version: 'test/1.0.0',
+        };
+      },
+    },
+  });
+  const url = await listen(api.server);
+  const headers = { 'content-type': 'application/json', 'x-dev-user-id': 'ocr-test-student' };
+  try {
+    const documentResponse = await fetch(`${url}/documents`, {
+      method: 'POST',
+      headers: { ...headers, 'idempotency-key': 'ocr-success-doc-1' },
+      body: JSON.stringify({
+        title: '合成 OCR 通知',
+        contentType: 'image/png',
+        text: 'binary-placeholder-not-used-as-ocr',
+        data_origin: 'synthetic',
+      }),
+    });
+    const documentBody = await documentResponse.json();
+    const parseResponse = await fetch(
+      `${url}/documents/${documentBody.document.document_id}/parse`,
+      {
+        method: 'POST',
+        headers: { ...headers, 'idempotency-key': 'ocr-success-parse-1' },
+        body: '{}',
+      },
+    );
+    const parseBody = await parseResponse.json();
+    assert.equal(parseResponse.status, 202);
+    assert.equal(parseBody.status, 'succeeded');
+    assert.equal(parseBody.result.verified_actions[0].title, '上传截图要求的材料');
+  } finally {
+    await close(api.server);
+    await close(ai);
+    repository.close();
+  }
+});
+
 test('API normalizes simple HTML before handing it to the text parser', async () => {
   const ai = createParserServer();
   const aiUrl = await listen(ai);

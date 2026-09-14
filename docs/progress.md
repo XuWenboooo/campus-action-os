@@ -10,5 +10,6 @@
 - 评测报告补齐 Material F1、Evidence Span F1（无金标准时明确为 null）、逐样本错误码和 Error Shield 原始错误记录；Repository 增加文件 SQLite 关闭/重开持久化验证。
 - 增加 HTML 文本标准化，以及图片/PDF 的显式 `OCR_NOT_CONFIGURED` 降级路径和测试；未把未配置 OCR 伪装为成功。
 - 增加 parser AbortSignal 超时、`PARSER_TIMEOUT` 持久化、生产环境身份认证闸门和文档删除确认测试。
+- 增加可注入、可审计的 `OcrProvider` 契约；默认 provider 明确不运行，synthetic provider 仅用于测试图片/PDF 文本进入同一解析闭环。
 
 仍为 `NOT_READY`：真实 OCR/provider、正式 800 条冻结评测、微信开发者工具人工验证、真实认证/提醒和生产部署均缺失；本地测试不能替代这些证据。

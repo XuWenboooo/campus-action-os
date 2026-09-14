@@ -82,8 +82,8 @@ test('Error Shield catches unsupported explicit claims and side-effect states', 
   assert.ok(errors.some((error) => error.code === 'TASK_SIDE_EFFECT_BLOCKED'));
 });
 
-test('document normalizer converts HTML and refuses media without configured OCR', () => {
-  const html = normalizeDocument({
+test('document normalizer converts HTML and refuses media without configured OCR', async () => {
+  const html = await normalizeDocument({
     schema_version: 'document/v1',
     document_id: 'synthetic-html',
     owner_user_id: 'synthetic-user',
@@ -100,7 +100,7 @@ test('document normalizer converts HTML and refuses media without configured OCR
     assert.match(html.text, /提交材料/);
     assert.equal(html.source, 'html_text');
   }
-  const image = normalizeDocument({
+  const image = await normalizeDocument({
     schema_version: 'document/v1',
     document_id: 'synthetic-image',
     owner_user_id: 'synthetic-user',
@@ -114,6 +114,38 @@ test('document normalizer converts HTML and refuses media without configured OCR
   assert.deepEqual(image, {
     ok: false,
     code: 'OCR_NOT_CONFIGURED',
-    message: '图片/PDF 需要经过已配置并可审计的 OCR/版面解析器；当前环境未启用该能力',
+    message: '没有配置可审计的 OCR provider；图片/PDF 解析未运行',
   });
+});
+
+test('document normalizer accepts only an injected OCR result for media', async () => {
+  const result = await normalizeDocument(
+    {
+      schema_version: 'document/v1',
+      document_id: 'synthetic-pdf',
+      owner_user_id: 'synthetic-user',
+      title: 'PDF notice',
+      content_type: 'application/pdf',
+      text: 'binary-placeholder-not-used-as-ocr',
+      content_sha256: '0'.repeat(64),
+      data_origin: 'synthetic',
+      created_at: '2099-01-01T00:00:00.000Z',
+    },
+    {
+      name: 'synthetic-ocr-test-only',
+      async extract() {
+        return {
+          status: 'succeeded' as const,
+          text: '适用对象：本科生\n1. 提交 PDF 中的申请\n截止：2099-10-03 17:00 前',
+          provider: 'synthetic-ocr-test-only',
+          version: 'test/1.0.0',
+        };
+      },
+    },
+  );
+  assert.equal(result.ok, true);
+  if (result.ok) {
+    assert.equal(result.source, 'ocr');
+    assert.match(result.text, /提交 PDF/);
+  }
 });

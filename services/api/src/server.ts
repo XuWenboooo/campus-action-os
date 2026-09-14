@@ -11,6 +11,7 @@ import {
   type VerifiedActionObject,
 } from '@campus-action-os/protocol';
 import { normalizeDocument } from '../../ai-parser/src/document-normalizer.js';
+import type { OcrProvider } from '../../ai-parser/src/ocr.js';
 import { Repository, RepositoryError } from './repository.js';
 
 const port = Number(process.env.API_PORT ?? 3000);
@@ -22,6 +23,7 @@ type ApiServerOptions = {
   parserUrl?: string;
   environment?: string;
   requestTimeoutMs?: number;
+  ocrProvider?: OcrProvider;
 };
 
 function requestIdFor(request: IncomingMessage): string {
@@ -150,7 +152,7 @@ async function parseDocument(
   parserBaseUrl: string,
   options: ApiServerOptions,
 ): Promise<void> {
-  const normalized = normalizeDocument(document);
+  const normalized = await normalizeDocument(document, options.ocrProvider);
   if (!normalized.ok) {
     repository.failParseJob(
       userId,

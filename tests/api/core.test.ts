@@ -357,6 +357,97 @@ test('API persists parser outage as a failed ParseJob instead of a fake success'
   }
 });
 
+test('API persists a protocol-level parser rejection with both result and error', async () => {
+  const rejectedParser = createServer(async (request, response) => {
+    let raw = '';
+    for await (const chunk of request) raw += String(chunk);
+    const input = JSON.parse(raw) as { request_id: string; document: { document_id: string } };
+    const timestamp = '2099-01-01T00:00:00.000Z';
+    response.writeHead(200, { 'content-type': 'application/json' }).end(
+      JSON.stringify({
+        schema_version: 'text-parse-response/v1',
+        request_id: input.request_id,
+        document_id: input.document.document_id,
+        status: 'rejected',
+        document_assessment: {
+          schema_version: 'document-assessment/v1',
+          document_id: input.document.document_id,
+          user_relevance: 'uncertain',
+          relevance_reason: '合成 Parser 拒答，需要人工处理',
+          evidence: [
+            {
+              evidence_id: 'rejected-assessment-evidence',
+              source_text: '合成通知',
+              field_name: 'other',
+            },
+          ],
+          verification_status: 'user_confirmation_required',
+        },
+        verified_actions: [],
+        action_graph: null,
+        warnings: [
+          {
+            code: 'PARSER_REJECTED',
+            message: '合成 Parser 拒绝生成可执行行动',
+          },
+        ],
+        parser_metadata: {
+          parser_version: 'synthetic-rejection-test',
+          model_provider: 'synthetic-rejection-test',
+          model_version: 'test/1.0.0',
+          prompt_version: 'test/1.0.0',
+          rule_version: 'test/1.0.0',
+          ocr_version: 'not_applicable',
+          started_at: timestamp,
+          completed_at: timestamp,
+          latency_ms: 1,
+        },
+      }),
+    );
+  });
+  const parserUrl = await listen(rejectedParser);
+  const repository = new Repository(':memory:');
+  const api = createApiServer({ repository, parserUrl });
+  const url = await listen(api.server);
+  const headers = {
+    'content-type': 'application/json',
+    'x-dev-user-id': 'rejected-parser-student',
+  };
+  try {
+    const documentResponse = await fetch(`${url}/documents`, {
+      method: 'POST',
+      headers: { ...headers, 'idempotency-key': 'rejected-document-1' },
+      body: JSON.stringify({
+        title: '合成拒答通知',
+        text: '适用对象：本科生\n请人工判断',
+        data_origin: 'synthetic',
+      }),
+    });
+    const documentBody = await documentResponse.json();
+    const parseResponse = await fetch(
+      `${url}/documents/${documentBody.document.document_id}/parse`,
+      {
+        method: 'POST',
+        headers: { ...headers, 'idempotency-key': 'rejected-parse-1' },
+        body: '{}',
+      },
+    );
+    const parseBody = await parseResponse.json();
+    assert.equal(parseResponse.status, 202);
+    assert.equal(parseBody.status, 'failed');
+    assert.equal(parseBody.result.status, 'rejected');
+    assert.equal(parseBody.error.code, 'PARSER_REJECTED');
+    const persisted = repository.getParseJob('rejected-parser-student', parseBody.parse_job_id);
+    assert.equal(persisted?.status, 'failed');
+    assert.equal(persisted?.result?.status, 'rejected');
+    assert.equal(persisted?.error?.code, 'PARSER_REJECTED');
+  } finally {
+    await close(api.server);
+    await close(rejectedParser);
+    repository.close();
+  }
+});
+
 test('API cancels an active task when its linked action is rejected', async () => {
   const ai = createParserServer();
   const aiUrl = await listen(ai);

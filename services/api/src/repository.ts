@@ -2,6 +2,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import type { DatabaseSync } from 'node:sqlite';
 import { migrateDatabase } from '../../../database/migrate.js';
 import {
+  createApiError,
   validateDocument,
   validateNotificationRevision,
   validateParseJob,
@@ -573,13 +574,23 @@ export class Repository {
     if (!job) throw new RepositoryError('PARSE_JOB_NOT_FOUND', 404, 'Parse job not found');
     const timestamp = now();
     const jobStatus = response.status === 'rejected' ? 'failed' : response.status;
+    const storedError =
+      response.status === 'rejected'
+        ? createApiError('PARSER_REJECTED', 'Parser rejected the document', requestId).error
+        : null;
     this.db.exec('BEGIN');
     try {
       this.db
         .prepare(
-          'UPDATE parse_jobs SET status = ?, result_json = ?, error_json = NULL, updated_at = ? WHERE parse_job_id = ?',
+          'UPDATE parse_jobs SET status = ?, result_json = ?, error_json = ?, updated_at = ? WHERE parse_job_id = ?',
         )
-        .run(jobStatus, json(response), timestamp, parseJobId);
+        .run(
+          jobStatus,
+          json(response),
+          storedError ? json(storedError) : null,
+          timestamp,
+          parseJobId,
+        );
       for (const action of response.verified_actions) {
         const valid = validateVerifiedActionObject(action);
         if (!valid.ok)

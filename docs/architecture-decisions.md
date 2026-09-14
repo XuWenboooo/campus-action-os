@@ -5,3 +5,4 @@
 - JSON Schema v1 remains authoritative for public protocol objects. TypeScript types and runtime validators are adapters, not a second semantic contract.
 - A deterministic rule parser is enabled for local proof. Real providers remain unconfigured and must not be represented as successful model output.
 - Media documents may have empty pre-OCR `Document.text`; their uploaded bytes are stored in the local `document_files` table and are passed only to the injected OCR boundary. This is an implementation of the frozen screenshot/PDF input path, not a claim that OCR has run.
+- Notice creation is role-gated in the local API; only an explicit development login can provision a synthetic publisher/admin role, while production identity remains unconfigured and blocked.

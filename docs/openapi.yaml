@@ -170,7 +170,12 @@ paths:
       requestBody:
         required: false
         content:
-          application/json: { schema: { type: object, properties: { userId: { type: string } } } }
+          application/json:
+            schema:
+              type: object
+              properties:
+                userId: { type: string }
+                role: { enum: [student, publisher, admin] }
       responses:
         '200': { description: Development session }
         '403': { description: Disabled in production }

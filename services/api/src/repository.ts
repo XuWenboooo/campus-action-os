@@ -252,6 +252,8 @@ export type NoticeRevisionInput = {
   confirmed?: boolean;
 };
 
+export type UserRole = 'student' | 'publisher' | 'admin';
+
 export class Repository {
   readonly db: DatabaseSync;
 
@@ -263,7 +265,7 @@ export class Repository {
     if (this.db.isOpen) this.db.close();
   }
 
-  ensureUser(userId: string, role: 'student' | 'publisher' | 'admin' = 'student'): void {
+  ensureUser(userId: string, role: UserRole = 'student'): void {
     const timestamp = now();
     this.db
       .prepare(
@@ -275,6 +277,24 @@ export class Repository {
         'INSERT OR IGNORE INTO user_profiles (user_id, profile_json, updated_at) VALUES (?, ?, ?)',
       )
       .run(userId, json({}), timestamp);
+  }
+
+  setDevelopmentRole(userId: string, role: UserRole, requestId: string): void {
+    this.ensureUser(userId);
+    this.db.prepare('UPDATE users SET role = ? WHERE user_id = ?').run(role, userId);
+    this.recordAudit(requestId, userId, 'auth.dev_role_set', 'user', userId, { role });
+  }
+
+  getUserRole(userId: string): UserRole | null {
+    const row = this.db.prepare('SELECT role FROM users WHERE user_id = ?').get(userId) as
+      Row | undefined;
+    return row ? (row.role as UserRole) : null;
+  }
+
+  requireRole(userId: string, roles: UserRole[]): void {
+    const role = this.getUserRole(userId);
+    if (!role || !roles.includes(role))
+      throw new RepositoryError('FORBIDDEN', 403, 'This operation requires publisher access');
   }
 
   getProfile(userId: string): PublicUserProfile {
@@ -966,7 +986,7 @@ export class Repository {
     body: string,
     requestId: string,
   ): NotificationRevision {
-    this.ensureUser(userId, 'publisher');
+    this.requireRole(userId, ['publisher', 'admin']);
     const noticeId = randomUUID();
     const revisionId = randomUUID();
     const createdAt = now();

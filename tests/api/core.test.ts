@@ -609,6 +609,23 @@ test('publisher notice endpoints retain revision history and all side effects re
     return { result, body: result.status === 204 ? null : await result.json() };
   };
   try {
+    const unauthorized = await call(
+      'POST',
+      '/notices',
+      {
+        title: '未授权通知',
+        body: '不应创建',
+      },
+      { 'idempotency-key': 'notice-unauthorized-1' },
+    );
+    assert.equal(unauthorized.result.status, 403);
+    assert.equal(unauthorized.body.error.code, 'FORBIDDEN');
+    const login = await call('POST', '/auth/dev-login', {
+      userId: 'synthetic-publisher',
+      role: 'publisher',
+    });
+    assert.equal(login.result.status, 200);
+    assert.equal(login.body.role, 'publisher');
     const noticeInput = { title: '合成发布通知', body: '请在 2099-10-01 前完成登记' };
     const created = await call('POST', '/notices', noticeInput, {
       'idempotency-key': 'notice-create-1',
@@ -686,6 +703,11 @@ test('notice revisions create auditable task sync proposals and require user acc
     return { result, body: result.status === 204 ? null : await result.json() };
   };
   try {
+    const login = await call('POST', '/auth/dev-login', {
+      userId: 'synthetic-sync-user',
+      role: 'publisher',
+    });
+    assert.equal(login.result.status, 200);
     const document = await call(
       'POST',
       '/documents',

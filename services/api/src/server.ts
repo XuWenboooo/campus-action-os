@@ -332,12 +332,25 @@ async function handle(
       typeof body.userId === 'string' && /^[A-Za-z0-9._:-]{1,100}$/.test(body.userId)
         ? body.userId
         : userId;
-    repository.ensureUser(requested);
+    let role: 'student' | 'publisher' | 'admin' = 'student';
+    if (body.role !== undefined) {
+      if (body.role !== 'student' && body.role !== 'publisher' && body.role !== 'admin')
+        throw new RepositoryError(
+          'INVALID_REQUEST',
+          400,
+          'role must be student, publisher, or admin',
+        );
+      role = body.role;
+      repository.setDevelopmentRole(requested, role, requestId);
+    } else {
+      repository.ensureUser(requested);
+    }
     send(
       response,
       200,
       {
         user_id: requested,
+        role: repository.getUserRole(requested),
         access_token: `dev:${requested}`,
         environment: options.environment ?? process.env.APP_ENV ?? 'local',
       },

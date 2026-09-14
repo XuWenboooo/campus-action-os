@@ -1,8 +1,8 @@
 openapi: 3.1.0
 info:
   title: Campus Action OS API
-  version: 0.1.0-foundation
-  description: Local/test API for the evidence-backed document-to-task foundation.
+  version: 0.1.1-foundation
+  description: Local/test API for the evidence-backed document-to-task foundation and notice-task synchronization.
 servers:
   - url: http://localhost:3000
 components:
@@ -22,6 +22,96 @@ components:
       $ref: ../schemas/interfaces/v1/task.schema.json
     NotificationRevision:
       $ref: ../schemas/interfaces/v1/notification-revision.schema.json
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema: { type: string, minLength: 1 }
+    DocumentId: { name: documentId, in: path, required: true, schema: { type: string } }
+    ParseJobId: { name: parseJobId, in: path, required: true, schema: { type: string } }
+    ActionId: { name: actionId, in: path, required: true, schema: { type: string } }
+    TaskId: { name: taskId, in: path, required: true, schema: { type: string } }
+    NoticeId: { name: noticeId, in: path, required: true, schema: { type: string } }
+    SyncEventId: { name: syncEventId, in: path, required: true, schema: { type: string } }
+  requestBodies:
+    DocumentInput:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [text]
+            properties:
+              title: { type: string }
+              text: { type: string }
+              contentType: { type: string }
+              data_origin: { enum: [synthetic, user_provided] }
+    Confirmation:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [confirmed]
+            properties: { confirmed: { const: true } }
+    Rejection:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [rejected]
+            properties: { rejected: { const: true } }
+    NoticeInput:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [title, body]
+            properties:
+              title: { type: string }
+              body: { type: string }
+    NoticeRevisionInput:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [title, body]
+            properties:
+              title: { type: string }
+              body: { type: string }
+              status: { enum: [draft, postponed, revoked] }
+              confirmed: { const: true }
+    NoticeTaskLink:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [noticeId, confirmed]
+            properties:
+              noticeId: { type: string }
+              confirmed: { const: true }
+    NoticeSyncResolution:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [decision, confirmed]
+            properties:
+              decision: { enum: [accept, reject] }
+              confirmed: { const: true }
+  responses:
+    Error:
+      description: Unified error object
+      content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+    NotFound:
+      description: Not found
+      content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
 paths:
   /health:
     get:
@@ -172,6 +262,36 @@ paths:
         - { $ref: '#/components/parameters/IdempotencyKey' }
       requestBody: { $ref: '#/components/requestBodies/Confirmation' }
       responses: { '200': { description: Completed task } }
+  /tasks/{taskId}/notices:
+    post:
+      security: [{ devUser: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/TaskId' }
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+      requestBody: { $ref: '#/components/requestBodies/NoticeTaskLink' }
+      responses:
+        {
+          '201': { description: Linked task to the latest published notice revision },
+          '409': { $ref: '#/components/responses/Error' },
+        }
+  /tasks/{taskId}/notice-sync:
+    get:
+      security: [{ devUser: [] }]
+      parameters: [{ $ref: '#/components/parameters/TaskId' }]
+      responses: { '200': { description: Notice-task links and pending or resolved sync events } }
+  /tasks/{taskId}/notice-sync/{syncEventId}/resolve:
+    post:
+      security: [{ devUser: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/TaskId' }
+        - { $ref: '#/components/parameters/SyncEventId' }
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+      requestBody: { $ref: '#/components/requestBodies/NoticeSyncResolution' }
+      responses:
+        {
+          '200': { description: Recorded user decision and resulting task },
+          '409': { $ref: '#/components/responses/Error' },
+        }
   /notices:
     post:
       security: [{ devUser: [] }]
@@ -197,8 +317,8 @@ paths:
       parameters:
         - { $ref: '#/components/parameters/NoticeId' }
         - { $ref: '#/components/parameters/IdempotencyKey' }
-      requestBody: { $ref: '#/components/requestBodies/NoticeInput' }
-      responses: { '201': { description: New draft revision } }
+      requestBody: { $ref: '#/components/requestBodies/NoticeRevisionInput' }
+      responses: { '201': { description: New draft, postponed or revoked revision } }
   /notices/{noticeId}/preview:
     get:
       security: [{ devUser: [] }]
@@ -226,71 +346,3 @@ paths:
                 },
             }
       responses: { '201': { description: Feedback recorded } }
-  parameters:
-    IdempotencyKey:
-      { name: Idempotency-Key, in: header, required: true, schema: { type: string, minLength: 1 } }
-    DocumentId: { name: documentId, in: path, required: true, schema: { type: string } }
-    ParseJobId: { name: parseJobId, in: path, required: true, schema: { type: string } }
-    ActionId: { name: actionId, in: path, required: true, schema: { type: string } }
-    TaskId: { name: taskId, in: path, required: true, schema: { type: string } }
-    NoticeId: { name: noticeId, in: path, required: true, schema: { type: string } }
-  requestBodies:
-    DocumentInput:
-      required: true
-      content:
-        application/json:
-          {
-            schema:
-              {
-                type: object,
-                required: [text],
-                properties:
-                  {
-                    title: { type: string },
-                    text: { type: string },
-                    contentType: { type: string },
-                    data_origin: { enum: [synthetic, user_provided] },
-                  },
-              },
-          }
-    Confirmation:
-      required: true
-      content:
-        {
-          application/json:
-            {
-              schema:
-                { type: object, required: [confirmed], properties: { confirmed: { const: true } } },
-            },
-        }
-    Rejection:
-      required: true
-      content:
-        {
-          application/json:
-            {
-              schema:
-                { type: object, required: [rejected], properties: { rejected: { const: true } } },
-            },
-        }
-    NoticeInput:
-      required: true
-      content:
-        {
-          application/json:
-            {
-              schema:
-                {
-                  type: object,
-                  required: [title, body],
-                  properties: { title: { type: string }, body: { type: string } },
-                },
-            },
-        }
-  responses:
-    Error:
-      description: Unified error object
-      content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
-    NotFound:
-      description: Not found
-      content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }

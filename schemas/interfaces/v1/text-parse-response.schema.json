@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://campus-action-os.example/schemas/interfaces/v1/text-parse-response.schema.json",
+  "title": "Campus Action OS Text Parse Response v1",
+  "type": "object",
+  "required": ["schema_version", "request_id", "document_id", "status", "document_assessment", "verified_actions", "action_graph", "warnings", "parser_metadata"],
+  "properties": {
+    "schema_version": { "const": "text-parse-response/v1" },
+    "request_id": { "type": "string", "minLength": 1 },
+    "document_id": { "type": "string", "minLength": 1 },
+    "status": { "enum": ["succeeded", "partial", "needs_confirmation", "rejected"] },
+    "document_assessment": { "$ref": "https://campus-action-os.example/schemas/interfaces/v1/document-assessment.schema.json" },
+    "verified_actions": {
+      "type": "array",
+      "items": { "$ref": "https://campus-action-os.example/schemas/v1/verified-action-object.schema.json" }
+    },
+    "action_graph": {
+      "anyOf": [
+        { "$ref": "https://campus-action-os.example/schemas/v1/action-graph.schema.json" },
+        { "type": "null" }
+      ]
+    },
+    "warnings": { "type": "array", "items": { "$ref": "#/$defs/warning" } },
+    "parser_metadata": { "$ref": "#/$defs/parserMetadata" },
+    "provenance": { "$ref": "#/$defs/provenance" }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "status": { "const": "partial" } } },
+      "then": { "properties": { "warnings": { "minItems": 1 } } }
+    },
+    {
+      "if": { "properties": { "status": { "const": "rejected" } } },
+      "then": { "properties": { "verified_actions": { "maxItems": 0 }, "action_graph": { "type": "null" } } }
+    }
+  ],
+  "unevaluatedProperties": false,
+  "$defs": {
+    "warning": {
+      "type": "object",
+      "required": ["code", "message"],
+      "properties": {
+        "code": { "type": "string", "minLength": 1, "pattern": "^[A-Z][A-Z0-9_]*$" },
+        "message": { "type": "string", "minLength": 1 },
+        "paths": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true }
+      },
+      "unevaluatedProperties": false
+    },
+    "parserMetadata": {
+      "type": "object",
+      "required": ["parser_version", "model_provider", "model_version", "prompt_version", "rule_version", "ocr_version", "started_at", "completed_at", "latency_ms"],
+      "properties": {
+        "parser_version": { "type": "string", "minLength": 1 },
+        "model_provider": { "type": "string", "minLength": 1 },
+        "model_version": { "type": "string", "minLength": 1 },
+        "prompt_version": { "type": "string", "minLength": 1 },
+        "rule_version": { "type": "string", "minLength": 1 },
+        "ocr_version": { "const": "not_applicable" },
+        "started_at": { "type": "string", "format": "date-time" },
+        "completed_at": { "type": "string", "format": "date-time" },
+        "latency_ms": { "type": "integer", "minimum": 0, "maximum": 300000 }
+      },
+      "unevaluatedProperties": false
+    },
+    "provenance": {
+      "type": "object",
+      "required": ["development_only", "synthetic", "not_model_output"],
+      "properties": {
+        "development_only": { "const": true },
+        "synthetic": { "const": true },
+        "not_model_output": { "const": true }
+      },
+      "unevaluatedProperties": false
+    }
+  }
+}

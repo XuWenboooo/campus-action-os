@@ -10,5 +10,5 @@
     "baseUrl": ".",
     "paths": { "@campus-action-os/protocol": ["packages/protocol/src/index.ts"] }
   },
-  "include": ["services/**/*.ts", "packages/**/*.ts", "tests/**/*.ts"]
+  "include": ["apps/**/*.ts", "services/**/*.ts", "packages/**/*.ts", "tests/**/*.ts"]
 }

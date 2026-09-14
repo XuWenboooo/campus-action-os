@@ -1,0 +1,1114 @@
+[
+  {
+    "case": "single-action",
+    "schema_version": "verified-action-object/v1",
+    "action_id": "a-single",
+    "title": "提交报名",
+    "user_relevance": "relevant",
+    "target_population": [
+      "本科生"
+    ],
+    "steps": [
+      {
+        "step_id": "s1",
+        "instruction": "在教务平台提交报名",
+        "epistemic_status": "explicit",
+        "evidence_ids": [
+          "e2"
+        ]
+      }
+    ],
+    "dependencies": [],
+    "conditions": [],
+    "exceptions": [],
+    "deadline": {
+      "value": "2026-10-01",
+      "precision": "day",
+      "boundary_semantics": "no_later_than",
+      "epistemic_status": "explicit",
+      "evidence_ids": [
+        "e3"
+      ]
+    },
+    "evidence": [
+      {
+        "evidence_id": "e1",
+        "source_text": "面向本科生",
+        "page_or_image": "p1",
+        "field_name": "target_population",
+        "epistemic_status": "explicit"
+      },
+      {
+        "evidence_id": "e2",
+        "source_text": "请在教务平台提交报名",
+        "page_or_image": "p1",
+        "field_name": "steps",
+        "epistemic_status": "explicit"
+      },
+      {
+        "evidence_id": "e3",
+        "source_text": "截止10月1日",
+        "page_or_image": "p1",
+        "field_name": "deadline",
+        "epistemic_status": "explicit"
+      }
+    ],
+    "confidence": {
+      "score": 0.95,
+      "basis": "rule_review"
+    },
+    "epistemic_status": "explicit",
+    "verification_status": "passed",
+    "task_status": "pending",
+    "change_history": [
+      {
+        "change_id": "c1",
+        "occurred_at": "2026-09-14T00:00:00Z",
+        "actor": "rule_engine",
+        "change_type": "reviewed",
+        "reason": "证据覆盖完整"
+      }
+    ],
+    "document_id": "doc-1",
+    "relevance_reason": "通知明确面向本科生",
+    "action_type": "action",
+    "required_materials": [],
+    "location": null,
+    "platform": null,
+    "entry_link": null,
+    "consequence": null,
+    "obligation": "unknown",
+    "result_stage": "rule_reviewed",
+    "field_status": {
+      "user_relevance": "unknown",
+      "target_population": "explicit",
+      "steps": "explicit",
+      "deadline": "explicit",
+      "required_materials": "unknown",
+      "location": "unknown",
+      "platform": "unknown",
+      "conditions": "unknown",
+      "exceptions": "unknown"
+    }
+  },
+  {
+    "case": "multi-action",
+    "schema_version": "verified-action-object/v1",
+    "action_id": "a-multi",
+    "title": "申请奖学金",
+    "user_relevance": "relevant",
+    "target_population": [
+      "大二学生"
+    ],
+    "steps": [
+      {
+        "step_id": "s1",
+        "instruction": "填写申请表",
+        "epistemic_status": "explicit",
+        "evidence_ids": [
+          "e2"
+        ]
+      },
+      {
+        "step_id": "s2",
+        "instruction": "上传成绩单",
+        "epistemic_status": "explicit",
+        "evidence_ids": [
+          "e3"
+        ]
+      }
+    ],
+    "dependencies": [
+      {
+        "dependency_id": "d1",
+        "from_step_id": "s1",
+        "to_step_id": "s2",
+        "type": "requires"
+      }
+    ],
+    "conditions": [],
+    "exceptions": [],
+    "deadline": {
+      "value": "2026-10-03T17:00:00+08:00",
+      "precision": "minute",
+      "boundary_semantics": "before",
+      "epistemic_status": "explicit",
+      "evidence_ids": [
+        "e4"
+      ]
+    },
+    "evidence": [
+      {
+        "evidence_id": "e1",
+        "source_text": "大二学生",
+        "page_or_image": "p1",
+        "field_name": "target_population",
+        "epistemic_status": "explicit"
+      },
+      {
+        "evidence_id": "e2",
+        "source_text": "填写申请表",
+        "page_or_image": "p1",
+        "field_name": "steps",
+        "epistemic_status": "explicit"
+      },
+      {
+        "evidence_id": "e3",
+        "source_text": "上传成绩单",
+        "page_or_image": "p1",
+        "field_name": "steps",
+        "epistemic_status": "explicit"
+      },
+      {
+        "evidence_id": "e4",
+        "source_text": "10月3日17:00前",
+        "page_or_image": "p1",
+        "field_name": "deadline",
+        "epistemic_status": "explicit"
+      }
+    ],
+    "confidence": {
+      "score": 0.9,
+      "basis": "rule_review"
+    },
+    "epistemic_status": "explicit",
+    "verification_status": "passed",
+    "task_status": "pending",
+    "change_history": [],
+    "document_id": "doc-2",
+    "relevance_reason": "目标人群匹配",
+    "action_type": "action",
+    "required_materials": [],
+    "location": null,
+    "platform": null,
+    "entry_link": null,
+    "consequence": null,
+    "obligation": "unknown",
+    "result_stage": "rule_reviewed",
+    "field_status": {
+      "user_relevance": "unknown",
+      "target_population": "explicit",
+      "steps": "explicit",
+      "deadline": "explicit",
+      "required_materials": "unknown",
+      "location": "unknown",
+      "platform": "unknown",
+      "conditions": "unknown",
+      "exceptions": "unknown"
+    }
+  },
+  {
+    "case": "conditional-branch",
+    "schema_version": "verified-action-object/v1",
+    "action_id": "a-branch",
+    "title": "按是否住宿办理",
+    "user_relevance": "relevant",
+    "target_population": [
+      "住宿生",
+      "走读生"
+    ],
+    "steps": [
+      {
+        "step_id": "s1",
+        "instruction": "确认住宿状态",
+        "epistemic_status": "explicit",
+        "evidence_ids": [
+          "e2"
+        ]
+      },
+      {
+        "step_id": "s2",
+        "instruction": "到宿管平台登记",
+        "epistemic_status": "explicit",
+        "evidence_ids": [
+          "e3"
+        ]
+      },
+      {
+        "step_id": "s3",
+        "instruction": "到教务平台登记",
+        "epistemic_status": "explicit",
+        "evidence_ids": [
+          "e4"
+        ]
+      }
+    ],
+    "dependencies": [
+      {
+        "dependency_id": "d1",
+        "from_step_id": "s1",
+        "to_step_id": "s2",
+        "type": "blocks",
+        "condition_id": "cond1"
+      },
+      {
+        "dependency_id": "d2",
+        "from_step_id": "s1",
+        "to_step_id": "s3",
+        "type": "blocks",
+        "condition_id": "cond1"
+      }
+    ],
+    "conditions": [
+      {
+        "condition_id": "cond1",
+        "statement": "如果住宿则走宿管路径，否则走教务路径",
+        "outcomes": [
+          {
+            "label": "住宿",
+            "step_ids": [
+              "s2"
+            ]
+          },
+          {
+            "label": "非住宿",
+            "step_ids": [
+              "s3"
+            ]
+          }
+        ],
+        "epistemic_status": "explicit",
+        "evidence_ids": [
+          "e5"
+        ]
+      }
+    ],
+    "exceptions": [],
+    "deadline": {
+      "value": null,
+      "precision": "unknown",
+      "boundary_semantics": "unknown",
+      "epistemic_status": "unknown",
+      "evidence_ids": []
+    },
+    "evidence": [
+      {
+        "evidence_id": "e1",
+        "source_text": "住宿生和走读生",
+        "page_or_image": "p1",
+        "field_name": "user_relevance",
+        "epistemic_status": "explicit"
+      },
+      {
+        "evidence_id": "e2",
+        "source_text": "确认住宿状态",
+        "page_or_image": "p1",
+        "field_name": "steps",
+        "epistemic_status": "explicit"
+      },
+      {
+        "evidence_id": "e3",
+        "source_text": "住宿到宿管平台",
+        "page_or_image": "p1",
+        "field_name": "steps",
+        "epistemic_status": "explicit"
+      },
+      {
+        "evidence_id": "e4",
+        "source_text": "走读到教务平台",
+        "page_or_image": "p1",
+        "field_name": "steps",
+        "epistemic_status": "explicit"
+      },
+      {
+        "evidence_id": "e5",
+        "source_text": "住宿则……否则……",
+        "page_or_image": "p1",
+        "field_name": "conditions",
+        "epistemic_status": "explicit"
+      }
+    ],
+    "confidence": {
+      "score": 0.78,
+      "basis": "model"
+    },
+    "epistemic_status": "rule_inferred",
+    "verification_status": "user_confirmation_required",
+    "task_status": "pending",
+    "change_history": [],
+    "document_id": "doc-3",
+    "relevance_reason": "通知包含当前用户可能所属路径",
+    "action_type": "action",
+    "required_materials": [],
+    "location": null,
+    "platform": null,
+    "entry_link": null,
+    "consequence": null,
+    "obligation": "unknown",
+    "result_stage": "model_output",
+    "field_status": {
+      "user_relevance": "explicit",
+      "target_population": "unknown",
+      "steps": "explicit",
+      "deadline": "unknown",
+      "required_materials": "unknown",
+      "location": "unknown",
+      "platform": "unknown",
+      "conditions": "unknown",
+      "exceptions": "unknown"
+    }
+  },
+  {
+    "case": "not-relevant",
+    "schema_version": "verified-action-object/v1",
+    "action_id": "a-no",
+    "title": "博士资格材料",
+    "user_relevance": "irrelevant",
+    "target_population": [
+      "博士生"
+    ],
+    "steps": [
+      {
+        "step_id": "s1",
+        "instruction": "提交博士资格材料",
+        "epistemic_status": "explicit",
+        "evidence_ids": [
+          "e2"
+        ]
+      }
+    ],
+    "dependencies": [],
+    "conditions": [],
+    "exceptions": [],
+    "deadline": {
+      "value": "2026-11-01",
+      "precision": "day",
+      "boundary_semantics": "no_later_than",
+      "epistemic_status": "explicit",
+      "evidence_ids": [
+        "e3"
+      ]
+    },
+    "evidence": [
+      {
+        "evidence_id": "e1",
+        "source_text": "仅限博士生",
+        "page_or_image": "p1",
+        "field_name": "target_population",
+        "epistemic_status": "explicit"
+      },
+      {
+        "evidence_id": "e2",
+        "source_text": "提交博士资格材料",
+        "page_or_image": "p1",
+        "field_name": "steps",
+        "epistemic_status": "explicit"
+      },
+      {
+        "evidence_id": "e3",
+        "source_text": "11月1日",
+        "page_or_image": "p1",
+        "field_name": "deadline",
+        "epistemic_status": "explicit"
+      }
+    ],
+    "confidence": {
+      "score": 0.99,
+      "basis": "rule_review"
+    },
+    "epistemic_status": "explicit",
+    "verification_status": "passed",
+    "task_status": "pending",
+    "change_history": [],
+    "document_id": "doc-4",
+    "relevance_reason": "通知明确仅面向博士生",
+    "action_type": "action",
+    "required_materials": [],
+    "location": null,
+    "platform": null,
+    "entry_link": null,
+    "consequence": null,
+    "obligation": "unknown",
+    "result_stage": "rule_reviewed",
+    "field_status": {
+      "user_relevance": "unknown",
+      "target_population": "explicit",
+      "steps": "explicit",
+      "deadline": "explicit",
+      "required_materials": "unknown",
+      "location": "unknown",
+      "platform": "unknown",
+      "conditions": "unknown",
+      "exceptions": "unknown"
+    }
+  },
+  {
+    "case": "relevance-uncertain",
+    "schema_version": "verified-action-object/v1",
+    "action_id": "a-uncertain",
+    "title": "相关通知确认",
+    "user_relevance": "uncertain",
+    "target_population": [
+      "相关同学"
+    ],
+    "steps": [
+      {
+        "step_id": "s1",
+        "instruction": "联系学院确认是否适用",
+        "epistemic_status": "rule_inferred",
+        "evidence_ids": [
+          "e1"
+        ]
+      }
+    ],
+    "dependencies": [],
+    "conditions": [],
+    "exceptions": [],
+    "deadline": {
+      "value": null,
+      "precision": "unknown",
+      "boundary_semantics": "unknown",
+      "epistemic_status": "unknown",
+      "evidence_ids": []
+    },
+    "evidence": [
+      {
+        "evidence_id": "e1",
+        "source_text": "相关同学请注意",
+        "page_or_image": "p1",
+        "field_name": "user_relevance",
+        "epistemic_status": "explicit"
+      }
+    ],
+    "confidence": {
+      "score": 0.42,
+      "basis": "model"
+    },
+    "epistemic_status": "unknown",
+    "verification_status": "user_confirmation_required",
+    "task_status": "pending",
+    "change_history": [],
+    "document_id": "doc-5",
+    "relevance_reason": "通知只写‘相关同学’，未说明年级",
+    "action_type": "action",
+    "required_materials": [],
+    "location": null,
+    "platform": null,
+    "entry_link": null,
+    "consequence": null,
+    "obligation": "unknown",
+    "result_stage": "rule_reviewed",
+    "field_status": {
+      "user_relevance": "unknown",
+      "target_population": "unknown",
+      "steps": "unknown",
+      "deadline": "unknown",
+      "required_materials": "unknown",
+      "location": "unknown",
+      "platform": "unknown",
+      "conditions": "unknown",
+      "exceptions": "unknown"
+    }
+  },
+  {
+    "case": "multi-stage-deadline",
+    "schema_version": "verified-action-object/v1",
+    "action_id": "a-stage-1",
+    "title": "分阶段提交",
+    "user_relevance": "relevant",
+    "target_population": [
+      "本校学生"
+    ],
+    "steps": [
+      {
+        "step_id": "s1",
+        "instruction": "提交意向",
+        "epistemic_status": "explicit",
+        "evidence_ids": [
+          "e2"
+        ]
+      }
+    ],
+    "dependencies": [],
+    "conditions": [],
+    "exceptions": [],
+    "deadline": {
+      "value": "2026-09-20",
+      "precision": "day",
+      "boundary_semantics": "no_later_than",
+      "epistemic_status": "explicit",
+      "evidence_ids": [
+        "e2"
+      ]
+    },
+    "evidence": [
+      {
+        "evidence_id": "e1",
+        "source_text": "本校学生",
+        "page_or_image": "p1",
+        "field_name": "target_population",
+        "epistemic_status": "explicit"
+      },
+      {
+        "evidence_id": "e2",
+        "source_text": "第一阶段9月20日提交意向",
+        "page_or_image": "p1",
+        "field_name": "deadline",
+        "epistemic_status": "explicit"
+      }
+    ],
+    "confidence": {
+      "score": 0.93,
+      "basis": "rule_review"
+    },
+    "epistemic_status": "explicit",
+    "verification_status": "passed",
+    "task_status": "pending",
+    "change_history": [],
+    "document_id": "doc-6",
+    "relevance_reason": "面向本校学生",
+    "action_type": "action",
+    "required_materials": [],
+    "location": null,
+    "platform": null,
+    "entry_link": null,
+    "consequence": null,
+    "obligation": "unknown",
+    "result_stage": "rule_reviewed",
+    "field_status": {
+      "user_relevance": "unknown",
+      "target_population": "explicit",
+      "steps": "unknown",
+      "deadline": "explicit",
+      "required_materials": "unknown",
+      "location": "unknown",
+      "platform": "unknown",
+      "conditions": "unknown",
+      "exceptions": "unknown"
+    }
+  },
+  {
+    "case": "deadline-boundary",
+    "schema_version": "verified-action-object/v1",
+    "action_id": "a-boundary",
+    "title": "截止时间确认",
+    "user_relevance": "relevant",
+    "target_population": [
+      "申请人"
+    ],
+    "steps": [
+      {
+        "step_id": "s1",
+        "instruction": "在17:00前上传文件",
+        "epistemic_status": "explicit",
+        "evidence_ids": [
+          "e2"
+        ]
+      }
+    ],
+    "dependencies": [],
+    "conditions": [],
+    "exceptions": [],
+    "deadline": {
+      "value": "2026-09-21T17:00:00+08:00",
+      "precision": "minute",
+      "boundary_semantics": "before",
+      "timezone": "Asia/Shanghai",
+      "epistemic_status": "explicit",
+      "evidence_ids": [
+        "e2"
+      ]
+    },
+    "evidence": [
+      {
+        "evidence_id": "e1",
+        "source_text": "申请人",
+        "page_or_image": "p1",
+        "field_name": "target_population",
+        "epistemic_status": "explicit"
+      },
+      {
+        "evidence_id": "e2",
+        "source_text": "17:00前",
+        "page_or_image": "p1",
+        "field_name": "deadline",
+        "epistemic_status": "explicit"
+      }
+    ],
+    "confidence": {
+      "score": 0.91,
+      "basis": "rule_review"
+    },
+    "epistemic_status": "explicit",
+    "verification_status": "passed",
+    "task_status": "pending",
+    "change_history": [],
+    "document_id": "doc-7",
+    "relevance_reason": "面向申请人",
+    "action_type": "action",
+    "required_materials": [],
+    "location": null,
+    "platform": null,
+    "entry_link": null,
+    "consequence": null,
+    "obligation": "unknown",
+    "result_stage": "rule_reviewed",
+    "field_status": {
+      "user_relevance": "unknown",
+      "target_population": "explicit",
+      "steps": "unknown",
+      "deadline": "explicit",
+      "required_materials": "unknown",
+      "location": "unknown",
+      "platform": "unknown",
+      "conditions": "unknown",
+      "exceptions": "unknown"
+    }
+  },
+  {
+    "case": "attachment-material",
+    "schema_version": "verified-action-object/v1",
+    "action_id": "a-material",
+    "title": "赛事材料提交",
+    "user_relevance": "relevant",
+    "target_population": [
+      "参赛队"
+    ],
+    "steps": [
+      {
+        "step_id": "s1",
+        "instruction": "将报名表和承诺书上传到赛事平台",
+        "epistemic_status": "explicit",
+        "evidence_ids": [
+          "e2"
+        ],
+        "required_materials": [
+          {
+            "material_id": "m1",
+            "description": "报名表",
+            "epistemic_status": "explicit",
+            "evidence_ids": [
+              "e2"
+            ]
+          },
+          {
+            "material_id": "m2",
+            "description": "承诺书附件",
+            "epistemic_status": "explicit",
+            "evidence_ids": [
+              "e2"
+            ]
+          }
+        ],
+        "location": {
+          "value": "赛事平台",
+          "epistemic_status": "explicit",
+          "evidence_ids": [
+            "e2"
+          ]
+        }
+      }
+    ],
+    "dependencies": [],
+    "conditions": [],
+    "exceptions": [],
+    "deadline": {
+      "value": "2026-09-30",
+      "precision": "day",
+      "boundary_semantics": "no_later_than",
+      "epistemic_status": "explicit",
+      "evidence_ids": [
+        "e3"
+      ]
+    },
+    "evidence": [
+      {
+        "evidence_id": "e1",
+        "source_text": "参赛队",
+        "page_or_image": "p1",
+        "field_name": "target_population",
+        "epistemic_status": "explicit"
+      },
+      {
+        "evidence_id": "e2",
+        "source_text": "报名表和承诺书上传到赛事平台",
+        "page_or_image": "p1",
+        "field_name": "required_materials",
+        "epistemic_status": "explicit"
+      },
+      {
+        "evidence_id": "e3",
+        "source_text": "9月30日前",
+        "page_or_image": "p1",
+        "field_name": "deadline",
+        "epistemic_status": "explicit"
+      }
+    ],
+    "confidence": {
+      "score": 0.94,
+      "basis": "rule_review"
+    },
+    "epistemic_status": "explicit",
+    "verification_status": "passed",
+    "task_status": "pending",
+    "change_history": [],
+    "document_id": "doc-8",
+    "relevance_reason": "通知面向参赛队",
+    "action_type": "action",
+    "required_materials": [
+      {
+        "material_id": "m1",
+        "description": "报名表",
+        "epistemic_status": "explicit",
+        "evidence_ids": [
+          "e2"
+        ]
+      },
+      {
+        "material_id": "m2",
+        "description": "承诺书附件",
+        "epistemic_status": "explicit",
+        "evidence_ids": [
+          "e2"
+        ]
+      }
+    ],
+    "location": null,
+    "platform": null,
+    "entry_link": null,
+    "consequence": null,
+    "obligation": "unknown",
+    "result_stage": "rule_reviewed",
+    "field_status": {
+      "user_relevance": "unknown",
+      "target_population": "explicit",
+      "steps": "unknown",
+      "deadline": "explicit",
+      "required_materials": "explicit",
+      "location": "unknown",
+      "platform": "unknown",
+      "conditions": "unknown",
+      "exceptions": "unknown"
+    }
+  },
+  {
+    "case": "ocr-damaged",
+    "schema_version": "verified-action-object/v1",
+    "action_id": "a-ocr",
+    "title": "OCR 通知确认",
+    "user_relevance": "uncertain",
+    "target_population": [
+      "[OCR缺损]"
+    ],
+    "steps": [
+      {
+        "step_id": "s1",
+        "instruction": "请用户确认通知适用人群后再执行",
+        "epistemic_status": "rule_inferred",
+        "evidence_ids": [
+          "e1"
+        ]
+      }
+    ],
+    "dependencies": [],
+    "conditions": [],
+    "exceptions": [],
+    "deadline": {
+      "value": null,
+      "precision": "unknown",
+      "boundary_semantics": "unknown",
+      "epistemic_status": "unknown",
+      "evidence_ids": []
+    },
+    "evidence": [
+      {
+        "evidence_id": "e1",
+        "source_text": "本通知面向□□生",
+        "page_or_image": "image-1",
+        "bounding_box": [
+          0.1,
+          0.2,
+          0.8,
+          0.3
+        ],
+        "field_name": "target_population",
+        "epistemic_status": "unknown"
+      }
+    ],
+    "confidence": {
+      "score": 0.31,
+      "basis": "model"
+    },
+    "epistemic_status": "unknown",
+    "verification_status": "user_confirmation_required",
+    "task_status": "pending",
+    "change_history": [],
+    "document_id": "doc-9",
+    "relevance_reason": "OCR 的人群字段缺损",
+    "action_type": "action",
+    "required_materials": [],
+    "location": null,
+    "platform": null,
+    "entry_link": null,
+    "consequence": null,
+    "obligation": "unknown",
+    "result_stage": "model_output",
+    "field_status": {
+      "user_relevance": "unknown",
+      "target_population": "explicit",
+      "steps": "unknown",
+      "deadline": "unknown",
+      "required_materials": "unknown",
+      "location": "unknown",
+      "platform": "unknown",
+      "conditions": "unknown",
+      "exceptions": "unknown"
+    }
+  },
+  {
+    "case": "date-conflict",
+    "schema_version": "verified-action-object/v1",
+    "action_id": "a-conflict",
+    "title": "冲突日期确认",
+    "user_relevance": "relevant",
+    "target_population": [
+      "报名学生"
+    ],
+    "steps": [
+      {
+        "step_id": "s1",
+        "instruction": "暂停提交并向发布方确认日期",
+        "epistemic_status": "rule_inferred",
+        "evidence_ids": [
+          "e2",
+          "e3"
+        ]
+      }
+    ],
+    "dependencies": [],
+    "conditions": [],
+    "exceptions": [],
+    "deadline": {
+      "value": null,
+      "precision": "unknown",
+      "boundary_semantics": "unknown",
+      "epistemic_status": "unknown",
+      "evidence_ids": [
+        "e2",
+        "e3"
+      ]
+    },
+    "evidence": [
+      {
+        "evidence_id": "e1",
+        "source_text": "报名学生",
+        "page_or_image": "p1",
+        "field_name": "target_population",
+        "epistemic_status": "explicit"
+      },
+      {
+        "evidence_id": "e2",
+        "source_text": "截止9月25日",
+        "page_or_image": "p1",
+        "field_name": "deadline",
+        "epistemic_status": "explicit"
+      },
+      {
+        "evidence_id": "e3",
+        "source_text": "截止9月27日",
+        "page_or_image": "p2",
+        "field_name": "deadline",
+        "epistemic_status": "explicit"
+      }
+    ],
+    "confidence": {
+      "score": 0.2,
+      "basis": "rule_review"
+    },
+    "epistemic_status": "unknown",
+    "verification_status": "conflict",
+    "task_status": "pending",
+    "change_history": [],
+    "document_id": "doc-10",
+    "relevance_reason": "面向报名学生",
+    "action_type": "action",
+    "required_materials": [],
+    "location": null,
+    "platform": null,
+    "entry_link": null,
+    "consequence": null,
+    "obligation": "unknown",
+    "result_stage": "rule_reviewed",
+    "field_status": {
+      "user_relevance": "unknown",
+      "target_population": "explicit",
+      "steps": "unknown",
+      "deadline": "explicit",
+      "required_materials": "unknown",
+      "location": "unknown",
+      "platform": "unknown",
+      "conditions": "unknown",
+      "exceptions": "unknown"
+    }
+  },
+  {
+    "case": "postponed",
+    "schema_version": "verified-action-object/v1",
+    "action_id": "a-postponed",
+    "title": "延期通知",
+    "user_relevance": "relevant",
+    "target_population": [
+      "全体学生"
+    ],
+    "steps": [
+      {
+        "step_id": "s1",
+        "instruction": "按延期后的日期提交",
+        "epistemic_status": "explicit",
+        "evidence_ids": [
+          "e2"
+        ]
+      }
+    ],
+    "dependencies": [],
+    "conditions": [],
+    "exceptions": [],
+    "deadline": {
+      "value": "2026-10-10",
+      "precision": "day",
+      "boundary_semantics": "no_later_than",
+      "epistemic_status": "explicit",
+      "evidence_ids": [
+        "e2"
+      ]
+    },
+    "evidence": [
+      {
+        "evidence_id": "e1",
+        "source_text": "全体学生",
+        "page_or_image": "p1",
+        "field_name": "target_population",
+        "epistemic_status": "explicit"
+      },
+      {
+        "evidence_id": "e2",
+        "source_text": "延期至10月10日",
+        "page_or_image": "p2",
+        "field_name": "deadline",
+        "epistemic_status": "explicit"
+      }
+    ],
+    "confidence": {
+      "score": 0.97,
+      "basis": "rule_review"
+    },
+    "epistemic_status": "explicit",
+    "verification_status": "passed",
+    "task_status": "pending",
+    "change_history": [
+      {
+        "change_id": "c1",
+        "occurred_at": "2026-09-14T00:00:00Z",
+        "actor": "publisher",
+        "change_type": "postponed",
+        "reason": "原通知延期",
+        "previous_action_id": "a-old"
+      }
+    ],
+    "document_id": "doc-11",
+    "relevance_reason": "面向全体学生",
+    "action_type": "action",
+    "required_materials": [],
+    "location": null,
+    "platform": null,
+    "entry_link": null,
+    "consequence": null,
+    "obligation": "unknown",
+    "result_stage": "rule_reviewed",
+    "field_status": {
+      "user_relevance": "unknown",
+      "target_population": "explicit",
+      "steps": "unknown",
+      "deadline": "explicit",
+      "required_materials": "unknown",
+      "location": "unknown",
+      "platform": "unknown",
+      "conditions": "unknown",
+      "exceptions": "unknown"
+    }
+  },
+  {
+    "case": "revoked",
+    "schema_version": "verified-action-object/v1",
+    "action_id": "a-revoked",
+    "title": "撤销通知",
+    "user_relevance": "relevant",
+    "target_population": [
+      "申请人"
+    ],
+    "steps": [
+      {
+        "step_id": "s1",
+        "instruction": "不要执行已撤销的报名动作",
+        "epistemic_status": "explicit",
+        "evidence_ids": [
+          "e2"
+        ]
+      }
+    ],
+    "dependencies": [],
+    "conditions": [],
+    "exceptions": [],
+    "deadline": {
+      "value": null,
+      "precision": "unknown",
+      "boundary_semantics": "unknown",
+      "epistemic_status": "unknown",
+      "evidence_ids": []
+    },
+    "evidence": [
+      {
+        "evidence_id": "e1",
+        "source_text": "申请人",
+        "page_or_image": "p1",
+        "field_name": "target_population",
+        "epistemic_status": "explicit"
+      },
+      {
+        "evidence_id": "e2",
+        "source_text": "报名通知撤销",
+        "page_or_image": "p2",
+        "field_name": "exceptions",
+        "epistemic_status": "explicit"
+      }
+    ],
+    "confidence": {
+      "score": 0.99,
+      "basis": "rule_review"
+    },
+    "epistemic_status": "explicit",
+    "verification_status": "passed",
+    "task_status": "cancelled",
+    "change_history": [
+      {
+        "change_id": "c1",
+        "occurred_at": "2026-09-14T00:00:00Z",
+        "actor": "publisher",
+        "change_type": "revoked",
+        "reason": "发布方撤销通知",
+        "previous_action_id": "a-old"
+      }
+    ],
+    "document_id": "doc-12",
+    "relevance_reason": "原通知面向申请人",
+    "action_type": "action",
+    "required_materials": [],
+    "location": null,
+    "platform": null,
+    "entry_link": null,
+    "consequence": null,
+    "obligation": "unknown",
+    "result_stage": "rule_reviewed",
+    "field_status": {
+      "user_relevance": "unknown",
+      "target_population": "explicit",
+      "steps": "unknown",
+      "deadline": "unknown",
+      "required_materials": "unknown",
+      "location": "unknown",
+      "platform": "unknown",
+      "conditions": "unknown",
+      "exceptions": "unknown"
+    }
+  }
+]

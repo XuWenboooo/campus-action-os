@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://campus-action-os.example/schemas/interfaces/v1/text-parse-request.schema.json",
+  "title": "Campus Action OS Text Parse Request v1",
+  "type": "object",
+  "required": ["schema_version", "request_id", "idempotency_key", "protocol_version", "document", "user_profile", "execution_context"],
+  "properties": {
+    "schema_version": { "const": "text-parse-request/v1" },
+    "request_id": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "idempotency_key": { "type": "string", "minLength": 1, "maxLength": 256 },
+    "protocol_version": { "const": "1.0.0" },
+    "document": { "$ref": "#/$defs/document" },
+    "user_profile": { "$ref": "#/$defs/userProfile" },
+    "execution_context": { "$ref": "#/$defs/executionContext" }
+  },
+  "unevaluatedProperties": false,
+  "$defs": {
+    "document": {
+      "type": "object",
+      "required": ["document_id", "content_type", "text", "content_sha256", "language", "timezone"],
+      "properties": {
+        "document_id": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "content_type": { "const": "text/plain" },
+        "text": { "type": "string", "minLength": 1, "maxLength": 100000 },
+        "content_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "language": { "type": "string", "minLength": 2, "maxLength": 32 },
+        "timezone": { "type": "string", "minLength": 1, "maxLength": 64 }
+      },
+      "unevaluatedProperties": false
+    },
+    "profileValue": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "profileList": { "type": "array", "items": { "type": "string", "minLength": 1, "maxLength": 128 }, "uniqueItems": true },
+    "userProfile": {
+      "type": "object",
+      "properties": {
+        "education_level": { "$ref": "#/$defs/profileValue" },
+        "grade": { "$ref": "#/$defs/profileValue" },
+        "college": { "$ref": "#/$defs/profileValue" },
+        "major": { "$ref": "#/$defs/profileValue" },
+        "campus": { "$ref": "#/$defs/profileValue" },
+        "student_categories": { "$ref": "#/$defs/profileList" },
+        "organization_memberships": { "$ref": "#/$defs/profileList" }
+      },
+      "unevaluatedProperties": false
+    },
+    "executionContext": {
+      "type": "object",
+      "required": ["environment", "deadline_ms", "requested_at"],
+      "properties": {
+        "environment": { "enum": ["local", "test", "demo", "production"] },
+        "deadline_ms": { "type": "integer", "minimum": 1, "maximum": 300000 },
+        "requested_at": { "type": "string", "format": "date-time" }
+      },
+      "unevaluatedProperties": false
+    }
+  }
+}

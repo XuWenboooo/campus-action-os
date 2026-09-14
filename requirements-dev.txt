@@ -1,0 +1,3 @@
+# Python 3.11-3.14; direct M1 test dependencies are intentionally pinned.
+pytest==9.1.1
+jsonschema==4.26.0

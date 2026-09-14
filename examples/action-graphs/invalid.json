@@ -1,0 +1,5 @@
+[
+  {"name":"dangling-dependency","graph":{"schema_version":"action-graph/v1","graph_id":"bad-dangling","nodes":[{"node_id":"n1","node_type":"action","action_id":"a1"}],"edges":[{"edge_id":"e1","from_node_id":"n1","to_node_id":"missing","edge_type":"blocks"}]}},
+  {"name":"cycle","graph":{"schema_version":"action-graph/v1","graph_id":"bad-cycle","nodes":[{"node_id":"n1","node_type":"action","action_id":"a1"},{"node_id":"n2","node_type":"action","action_id":"a2"}],"edges":[{"edge_id":"e1","from_node_id":"n1","to_node_id":"n2","edge_type":"blocks"},{"edge_id":"e2","from_node_id":"n2","to_node_id":"n1","edge_type":"requires"}]}},
+  {"name":"branch-without-condition","graph":{"schema_version":"action-graph/v1","graph_id":"bad-branch","nodes":[{"node_id":"n1","node_type":"decision","condition_ids":["cond1"]},{"node_id":"n2","node_type":"action","action_id":"a2"}],"edges":[{"edge_id":"e1","from_node_id":"n1","to_node_id":"n2","edge_type":"branches_to"}]}}
+]

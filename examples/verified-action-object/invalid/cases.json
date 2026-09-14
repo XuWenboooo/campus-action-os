@@ -1,0 +1,7 @@
+[
+  {"name":"missing-evidence","base":"single-action","mutation":"remove_evidence"},
+  {"name":"bad-enum","base":"single-action","mutation":"bad_relevance_enum"},
+  {"name":"bad-time-boundary","base":"single-action","mutation":"bad_boundary"},
+  {"name":"inconsistent-status","base":"single-action","mutation":"confirmed_without_basis"},
+  {"name":"conflict-with-concrete-deadline","base":"date-conflict","mutation":"conflict_concrete_value"}
+]

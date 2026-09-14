@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://campus-action-os.local/benchmark/campus-action-bench-v1.schema.json",
+  "title": "CampusActionBench v1 sample",
+  "type": "object",
+  "required": ["sample_id", "provenance", "notice_category", "raw_input", "user_profile", "gold", "annotation", "data_version", "change_history"],
+  "properties": {
+    "sample_id": {"type":"string", "pattern":"^CABV1-[A-Z0-9-]+$"},
+    "source_group": {"type":"string", "description":"Stable lineage key used for leakage prevention."},
+    "provenance": {"type":"object", "required":["source_type","authorization_status","data_origin"], "properties": {
+      "source_type":{"enum":["authorized_real","authorized_reconstructed","synthetic_development"]},
+      "authorization_status":{"enum":["pending","documented","revoked","not_applicable_synthetic"]},
+      "data_origin":{"enum":["real","reconstructed","synthetic"]},
+      "authorization_record_id":{"type":["string","null"]}, "collection_date":{"type":["string","null"]}
+    }, "additionalProperties":false},
+    "notice_category":{"type":"string","enum":["academic","administrative","activity","finance","housing","health_safety","library","career","transport","other"]},
+    "raw_input":{"type":"object","required":["input_type","ocr_text","layout"],"properties":{
+      "input_type":{"enum":["text","image","pdf","web_link","attachment"]},
+      "ocr_text":{"type":"string"},
+      "layout":{"type":"object","required":["pages"],"properties":{"pages":{"type":"integer","minimum":1},"blocks":{"type":"array"}}}
+    }},
+    "user_profile":{"type":"object","required":["profile_id","attributes"],"properties":{"profile_id":{"type":"string"},"attributes":{"type":"object"}}},
+    "gold":{"type":"object","required":["relevance","action_graph","field_evidence","ambiguities","conflicts","missing_information","risk_labels"],"properties":{
+      "relevance":{"enum":["relevant","not_relevant","uncertain"]},
+      "protocol_projection":{"type":"object","required":["schema_version","object_kind","payload"],"properties":{"schema_version":{"enum":["verified-action-object/v1","action-graph/v1"]},"object_kind":{"enum":["verified_action_object","action_graph"]},"payload":{"type":"object","description":"Validated against the matching local schemas/v1 document by the integration test; this container does not redefine product semantics."}},"allOf":[{"if":{"properties":{"object_kind":{"const":"verified_action_object"}}},"then":{"properties":{"schema_version":{"const":"verified-action-object/v1"}}}},{"if":{"properties":{"object_kind":{"const":"action_graph"}}},"then":{"properties":{"schema_version":{"const":"action-graph/v1"}}}}],"additionalProperties":false},
+      "action_graph":{"type":"object","required":["actions"],"properties":{"actions":{"type":"array"},"dependencies":{"type":"array"}}},
+      "field_evidence":{"type":"array","items":{"type":"object","required":["field","text_start","text_end"]}},
+      "ambiguities":{"type":"array"},"conflicts":{"type":"array"},"missing_information":{"type":"array"},"risk_labels":{"type":"array"}
+    }},
+    "annotation":{"type":"object","required":["annotator_ids","adjudication_status"],"properties":{"annotator_ids":{"type":"array","minItems":2},"adjudication_status":{"enum":["pending","agreed","adjudicated"]},"adjudicator_id":{"type":["string","null"]}}},
+    "data_version":{"type":"string"},"change_history":{"type":"array"}
+  },
+  "additionalProperties": false
+}

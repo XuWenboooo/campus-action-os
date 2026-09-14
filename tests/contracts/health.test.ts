@@ -237,3 +237,49 @@ test('runtime response validator keeps verified actions and graph actions consis
   if (!alignment.ok)
     assert.ok(alignment.errors.some((error) => error.keyword === 'evidence_alignment'));
 });
+
+test('runtime response validator rejects cross-document and duplicate action identities', () => {
+  const crossDocument = {
+    ...validAction,
+    document_id: 'another-document',
+  };
+  const response = {
+    schema_version: 'text-parse-response/v1',
+    request_id: 'req-action-identity',
+    document_id: 'doc-test',
+    status: 'succeeded',
+    document_assessment: {
+      schema_version: 'document-assessment/v1',
+      document_id: 'doc-test',
+      user_relevance: 'relevant',
+      relevance_reason: '画像匹配',
+      evidence: [{ evidence_id: 'e3', source_text: '学生', field_name: 'user_relevance' }],
+      verification_status: 'passed',
+    },
+    verified_actions: [crossDocument, { ...validAction }],
+    action_graph: {
+      schema_version: 'action-graph/v1',
+      graph_id: 'g-action-identity',
+      nodes: [{ node_id: 'node-1', node_type: 'action', action_id: 'a-test' }],
+      edges: [],
+    },
+    warnings: [],
+    parser_metadata: {
+      parser_version: 'test/1.0.0',
+      model_provider: 'test',
+      model_version: 'test',
+      prompt_version: 'test',
+      rule_version: 'test',
+      ocr_version: 'not_applicable',
+      started_at: '2099-01-01T00:00:00.000Z',
+      completed_at: '2099-01-01T00:00:00.000Z',
+      latency_ms: 0,
+    },
+  };
+  const validation = validateTextParseResponse(response);
+  assert.equal(validation.ok, false);
+  if (!validation.ok) {
+    assert.ok(validation.errors.some((error) => error.keyword === 'consistency'));
+    assert.ok(validation.errors.some((error) => error.keyword === 'unique'));
+  }
+});

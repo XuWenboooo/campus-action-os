@@ -368,7 +368,13 @@ export function parseText(request: TextParseRequest): TextParseResponse | Parser
           field_name: 'user_relevance' as const,
         },
       ]
-    : [];
+    : [
+        {
+          evidence_id: `${request.document.document_id}:evidence:assessment`,
+          source_text: lines[0] ?? source,
+          field_name: 'other' as const,
+        },
+      ];
   const executableActions = userRelevance === 'irrelevant' ? [] : parsedActions;
   const completedAt = new Date().toISOString();
   const response: TextParseResponse = {

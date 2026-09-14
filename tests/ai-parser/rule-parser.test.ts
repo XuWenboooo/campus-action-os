@@ -240,6 +240,17 @@ test('rule parser matches audience fields instead of treating every student prof
   assert.ok(matched.verified_actions[0].evidence.some((item) => item.field_name === 'platform'));
 });
 
+test('rule parser retains an actionable notice without an audience as confirmation-needed', () => {
+  const result = parseText(request('1. 提交材料\n截止：2099-10-03 17:00 前'));
+  assert.equal('code' in result, false);
+  if ('code' in result) return;
+  assert.equal(result.status, 'needs_confirmation');
+  assert.equal(result.document_assessment.user_relevance, 'uncertain');
+  assert.equal(result.document_assessment.verification_status, 'user_confirmation_required');
+  assert.equal(result.document_assessment.evidence[0]?.field_name, 'other');
+  assert.equal(result.verified_actions.length, 1);
+});
+
 test('rule parser keeps ambiguous time lines as deadline evidence', () => {
   const result = parseText(request('适用对象：本科生\n1. 参加说明会\n时间尽快确认'));
   assert.equal('code' in result, false);

@@ -7,6 +7,7 @@ import {
   validateNotificationRevision,
   validateParseJob,
   validateTask,
+  validateTextParseResponse,
   validateUserProfile,
   validateVerifiedActionObject,
   type ApiError,
@@ -644,10 +645,33 @@ export class Repository {
       .prepare('SELECT * FROM parse_jobs WHERE parse_job_id = ? AND user_id = ?')
       .get(parseJobId, userId) as Row | undefined;
     if (!job) throw new RepositoryError('PARSE_JOB_NOT_FOUND', 404, 'Parse job not found');
+    if (job.status !== 'running')
+      throw new RepositoryError(
+        'INVALID_STATE_TRANSITION',
+        409,
+        `Parse job in ${text(job.status)} state cannot be completed`,
+      );
+    if (
+      text(job.document_id) !== response.document_id ||
+      text(job.request_id) !== response.request_id
+    )
+      throw new RepositoryError(
+        'PARSER_RESPONSE_INVALID',
+        500,
+        'Parser response identity does not match the parse job',
+      );
+    const validResponse = validateTextParseResponse(response);
+    if (!validResponse.ok)
+      throw new RepositoryError(
+        'PARSER_RESPONSE_INVALID',
+        500,
+        'Parser response failed schema validation',
+      );
+    const persistedResponse = validResponse.value;
     const timestamp = now();
-    const jobStatus = response.status === 'rejected' ? 'failed' : response.status;
+    const jobStatus = persistedResponse.status === 'rejected' ? 'failed' : persistedResponse.status;
     const storedError =
-      response.status === 'rejected'
+      persistedResponse.status === 'rejected'
         ? createApiError('PARSER_REJECTED', 'Parser rejected the document', requestId).error
         : null;
     this.db.exec('BEGIN');
@@ -658,12 +682,12 @@ export class Repository {
         )
         .run(
           jobStatus,
-          json(response),
+          json(persistedResponse),
           storedError ? json(storedError) : null,
           timestamp,
           parseJobId,
         );
-      for (const action of response.verified_actions) {
+      for (const action of persistedResponse.verified_actions) {
         const valid = validateVerifiedActionObject(action);
         if (!valid.ok)
           throw new RepositoryError(
@@ -671,6 +695,26 @@ export class Repository {
             500,
             'Parser response failed schema validation',
           );
+        if (valid.value.document_id !== response.document_id) {
+          throw new RepositoryError(
+            'PARSER_RESPONSE_INVALID',
+            500,
+            'Parser action document_id does not match the parse job document',
+          );
+        }
+        const existing = this.db
+          .prepare('SELECT document_id, user_id FROM verified_actions WHERE action_id = ?')
+          .get(valid.value.action_id) as Row | undefined;
+        if (
+          existing &&
+          (text(existing.document_id) !== response.document_id || text(existing.user_id) !== userId)
+        ) {
+          throw new RepositoryError(
+            'PARSER_RESPONSE_INVALID',
+            500,
+            'Parser action_id is already owned by another document or user',
+          );
+        }
         this.db
           .prepare(
             'INSERT INTO verified_actions (action_id, document_id, user_id, payload_json, result_stage, verification_status, task_status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, COALESCE((SELECT created_at FROM verified_actions WHERE action_id = ?), ?), ?) ON CONFLICT(action_id) DO UPDATE SET payload_json = excluded.payload_json, result_stage = excluded.result_stage, verification_status = excluded.verification_status, task_status = excluded.task_status, updated_at = excluded.updated_at',
@@ -706,21 +750,21 @@ export class Repository {
         }
         insertActionChanges(this.db, action);
       }
-      if (response.action_graph) {
+      if (persistedResponse.action_graph) {
         this.db
           .prepare(
             'INSERT OR REPLACE INTO action_graphs (graph_id, document_id, user_id, payload_json, created_at) VALUES (?, ?, ?, ?, ?)',
           )
           .run(
-            response.action_graph.graph_id,
-            response.document_id,
+            persistedResponse.action_graph.graph_id,
+            persistedResponse.document_id,
             userId,
-            json(response.action_graph),
+            json(persistedResponse.action_graph),
             timestamp,
           );
       }
       this.recordAudit(requestId, userId, 'parse_job.completed', 'parse_job', parseJobId, {
-        status: response.status,
+        status: persistedResponse.status,
       });
       this.db.exec('COMMIT');
     } catch (error) {
@@ -730,6 +774,16 @@ export class Repository {
   }
 
   failParseJob(userId: string, parseJobId: string, error: unknown, requestId: string): void {
+    const job = this.db
+      .prepare('SELECT status FROM parse_jobs WHERE parse_job_id = ? AND user_id = ?')
+      .get(parseJobId, userId) as Row | undefined;
+    if (!job) throw new RepositoryError('PARSE_JOB_NOT_FOUND', 404, 'Parse job not found');
+    if (job.status !== 'queued' && job.status !== 'running')
+      throw new RepositoryError(
+        'INVALID_STATE_TRANSITION',
+        409,
+        `Parse job in ${text(job.status)} state cannot be failed`,
+      );
     const timestamp = now();
     const storedError = normalizedError(error, requestId);
     const result = this.db

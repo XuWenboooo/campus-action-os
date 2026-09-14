@@ -235,6 +235,81 @@ test('Repository materializes action steps, dependencies, deadlines, and materia
         .count,
       2,
     );
+    assert.throws(
+      () =>
+        repository.completeParseJob(
+          'projection-user',
+          parseJob.parseJobId,
+          response,
+          'projection-complete-replay',
+        ),
+      /cannot be completed/,
+    );
+  } finally {
+    repository.close();
+  }
+});
+
+test('Repository rolls back a parser response that contains a cross-document action', () => {
+  const repository = new Repository(':memory:');
+  try {
+    const document = repository.createDocument({
+      ownerUserId: 'isolated-parser-user',
+      title: '隔离通知',
+      contentType: 'text/plain',
+      text: '适用对象：本科生\n1. 提交材料\n截止：2099-10-03 前',
+      dataOrigin: 'synthetic',
+    });
+    const parseJob = repository.createParseJob(
+      'isolated-parser-user',
+      document.document_id,
+      'isolated-parser-request',
+      'isolated-parser-key',
+      'b'.repeat(64),
+    );
+    repository.startParseJob('isolated-parser-user', parseJob.parseJobId, 'isolated-parser-start');
+    const request: TextParseRequest = {
+      schema_version: 'text-parse-request/v1',
+      request_id: 'isolated-parser-request',
+      idempotency_key: 'isolated-parser-key',
+      protocol_version: '1.0.0',
+      document: {
+        document_id: document.document_id,
+        content_type: 'text/plain',
+        text: document.text,
+        content_sha256: document.content_sha256,
+        language: 'zh-CN',
+        timezone: 'Asia/Shanghai',
+      },
+      user_profile: { education_level: '本科生' },
+      execution_context: {
+        environment: 'test',
+        deadline_ms: 5000,
+        requested_at: '2099-01-01T00:00:00.000Z',
+      },
+    };
+    const parsed = parseText(request);
+    assert.equal('code' in parsed, false);
+    if ('code' in parsed) return;
+    const tampered = {
+      ...parsed,
+      verified_actions: [{ ...parsed.verified_actions[0], document_id: 'another-document' }],
+    };
+    assert.throws(
+      () =>
+        repository.completeParseJob(
+          'isolated-parser-user',
+          parseJob.parseJobId,
+          tampered,
+          'isolated-parser-complete',
+        ),
+      /schema validation|cross-document|document_id/,
+    );
+    assert.equal(
+      repository.getParseJob('isolated-parser-user', parseJob.parseJobId)?.status,
+      'running',
+    );
+    assert.equal(repository.listActions('isolated-parser-user', document.document_id).length, 0);
   } finally {
     repository.close();
   }

@@ -742,6 +742,13 @@ export function validateTextParseResponse(
     const actionResult = validateVerifiedActionObject(action, rootDir);
     if (!actionResult.ok)
       errors.push(...prefixedErrors(`/verified_actions/${index}`, actionResult.errors));
+    if (action.document_id !== response.document_id) {
+      errors.push({
+        path: `/verified_actions/${index}/document_id`,
+        keyword: 'consistency',
+        message: 'verified action document_id must equal document_id',
+      });
+    }
     if (action.user_relevance === 'irrelevant') {
       errors.push({
         path: `/verified_actions/${index}/user_relevance`,
@@ -749,6 +756,17 @@ export function validateTextParseResponse(
         message: 'irrelevant documents cannot contain an action object',
       });
     }
+  }
+  const responseActionIds = new Set<string>();
+  for (const [index, action] of response.verified_actions.entries()) {
+    if (responseActionIds.has(action.action_id)) {
+      errors.push({
+        path: `/verified_actions/${index}/action_id`,
+        keyword: 'unique',
+        message: 'action_id must be unique within a response',
+      });
+    }
+    responseActionIds.add(action.action_id);
   }
 
   if (response.action_graph !== null) {

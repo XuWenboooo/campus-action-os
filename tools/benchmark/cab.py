@@ -4,9 +4,11 @@ import argparse, hashlib, json, os, re, sys
 from collections import Counter, defaultdict
 from pathlib import Path
 from difflib import SequenceMatcher
+from jsonschema import Draft202012Validator, FormatChecker
 
 REQUIRED = ["sample_id","provenance","notice_category","raw_input","user_profile","gold","annotation","data_version","change_history"]
 PII = re.compile(r"(?:\b1[3-9]\d{9}\b|\b\d{17}[\dXx]\b|\b\d{10,12}\b|住址|身份证|手机号|学号|真实姓名)")
+BENCHMARK_SCHEMA = Path(__file__).resolve().parents[2] / "benchmark" / "schema" / "campus-action-bench-v1.schema.json"
 
 def load(p):
     rows=[]
@@ -16,23 +18,70 @@ def load(p):
             except json.JSONDecodeError as e: rows.append((n,{"__parse_error__":str(e)}))
     return rows
 
+def notice_text(x):
+    raw_input=x.get("raw_input",{})
+    text=raw_input.get("ocr_text","") if isinstance(raw_input,dict) else ""
+    return text if isinstance(text,str) else ""
+
 def audit(args):
     rows=load(args.input); errors=[]; warnings=[]; ids=[]; groups=defaultdict(list); cats=Counter(); flags=Counter()
+    validator=Draft202012Validator(json.loads(BENCHMARK_SCHEMA.read_text(encoding="utf-8")), format_checker=FormatChecker())
     for line,x in rows:
         if "__parse_error__" in x: errors.append(f"line {line}: invalid JSON"); continue
-        ids.append(x.get("sample_id")); groups[x.get("source_group",x.get("sample_id"))].append(x.get("sample_id")); cats[x.get("notice_category")]+=1
+        sample_id=x.get("sample_id")
+        sample_key=sample_id if isinstance(sample_id,str) else str(sample_id)
+        source_group=x.get("source_group",sample_key)
+        source_key=source_group if isinstance(source_group,str) else str(source_group)
+        ids.append(sample_key); groups[source_key].append(sample_key)
+        category=x.get("notice_category")
+        cats[category if isinstance(category,str) else str(category)]+=1
+        schema_errors=sorted(validator.iter_errors(x), key=lambda error: list(error.path))
+        if schema_errors:
+            first=schema_errors[0]
+            path="/"+"/".join(str(part) for part in first.path)
+            errors.append(f"{x.get('sample_id')}: schema validation failed at {path or '/'}: {first.message}")
         miss=[k for k in REQUIRED if k not in x]
         if miss: errors.append(f"{x.get('sample_id')}: missing {','.join(miss)}")
-        prov=x.get("provenance",{}); origin=prov.get("data_origin")
+        prov=x.get("provenance",{})
+        if not isinstance(prov,dict): prov={}
+        origin=prov.get("data_origin")
         if origin=="synthetic" and prov.get("source_type")!="synthetic_development": errors.append(f"{x.get('sample_id')}: synthetic sample not marked")
-        text=x.get("raw_input",{}).get("ocr_text","")
+        text=notice_text(x)
+        if args.expected:
+            if origin not in {"real", "reconstructed"}:
+                errors.append(f"{x.get('sample_id')}: formal audit requires real or reconstructed data")
+            if prov.get("authorization_status")!="documented":
+                errors.append(f"{x.get('sample_id')}: formal audit requires documented authorization")
+            annotation=x.get("annotation", {})
+            if not isinstance(annotation,dict): annotation={}
+            annotator_ids=annotation.get("annotator_ids", []) if isinstance(annotation, dict) else []
+            if not isinstance(annotator_ids,list): annotator_ids=[]
+            annotator_ids=[item for item in annotator_ids if isinstance(item,str)]
+            if annotation.get("adjudication_status")!="adjudicated":
+                errors.append(f"{x.get('sample_id')}: formal audit requires adjudicated annotation")
+            if len(set(annotator_ids)) < 2:
+                errors.append(f"{x.get('sample_id')}: formal audit requires two distinct annotators")
+            if not isinstance(x.get("source_group"), str) or not x["source_group"].strip():
+                errors.append(f"{x.get('sample_id')}: formal audit requires source_group")
         if PII.search(text) or PII.search(json.dumps(x,ensure_ascii=False)): errors.append(f"{x.get('sample_id')}: possible sensitive information")
-        gold=x.get("gold",{}); raw=text
-        for ev in gold.get("field_evidence",[]):
+        gold=x.get("gold",{})
+        if not isinstance(gold,dict): gold={}
+        raw=text
+        field_evidence=gold.get("field_evidence",[])
+        if not isinstance(field_evidence,list): field_evidence=[]
+        for ev in field_evidence:
+            if not isinstance(ev,dict):
+                errors.append(f"{x.get('sample_id')}: invalid evidence span")
+                continue
             a,b=ev.get("text_start"),ev.get("text_end")
             if not isinstance(a,int) or not isinstance(b,int) or a<0 or b<a or b>len(raw): errors.append(f"{x.get('sample_id')}: invalid evidence span")
+        risk_labels=gold.get("risk_labels",[])
+        if not isinstance(risk_labels,list): risk_labels=[]
+        risk_tags={tag for tag in risk_labels if isinstance(tag,str)}
+        action_graph=gold.get("action_graph",{})
+        actions=action_graph.get("actions",[]) if isinstance(action_graph,dict) else []
         for tag in ["multi_action","population_condition","irrelevant_profile","multi_stage","attachment","ambiguity","ocr_review","low_quality_input","change"]:
-            if tag in set(gold.get("risk_labels",[])) or (tag=="multi_action" and len(gold.get("action_graph",{}).get("actions",[]))>1): flags[tag]+=1
+            if tag in risk_tags or (tag=="multi_action" and isinstance(actions,list) and len(actions)>1): flags[tag]+=1
     dup=[i for i,c in Counter(ids).items() if i and c>1]
     if dup: errors.append("duplicate IDs: "+", ".join(dup))
     total=len([x for _,x in rows if "__parse_error__" not in x]); cats_report={k:{"count":v,"ratio":v/total if total else 0} for k,v in sorted(cats.items())}
@@ -49,9 +98,9 @@ def audit(args):
         for cp in args.compare:
             for _,cx in load(cp):
                 if "__parse_error__" not in cx:
-                    norm=re.sub(r"\s+","",cx.get("raw_input",{}).get("ocr_text","")).lower()
+                    norm=re.sub(r"\s+","",notice_text(cx)).lower()
                     if norm: seen.setdefault(norm,[]).append((cp,cx.get("sample_id")))
-        current={re.sub(r"\s+","",x.get("raw_input",{}).get("ocr_text","")).lower():x.get("sample_id") for _,x in rows if "__parse_error__" not in x}
+        current={re.sub(r"\s+","",notice_text(x)).lower():x.get("sample_id") for _,x in rows if "__parse_error__" not in x}
         exact=[{"sample_id":sid,"other":v} for norm,sid in current.items() if norm in seen for v in seen[norm]]
         near=[]; norms=list(current)
         for i,n in enumerate(norms):

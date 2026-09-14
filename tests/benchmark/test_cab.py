@@ -39,5 +39,17 @@ class BenchmarkToolsTest(unittest.TestCase):
             r=run('audit',SAMPLE,'--expected','--compare',other)
             report=json.loads(r.stdout); self.assertNotEqual(r.returncode,0)
             self.assertTrue(report['cross_dataset_duplicates']['exact'])
+            self.assertTrue(any('formal audit requires real or reconstructed data' in item for item in report['errors']))
+
+    def test_audit_validates_each_sample_against_the_benchmark_schema(self):
+        with tempfile.TemporaryDirectory() as td:
+            invalid=Path(td)/'invalid.jsonl'
+            sample=json.loads(SAMPLE.read_text(encoding='utf-8').splitlines()[0])
+            del sample['gold']['relevance']
+            invalid.write_text(json.dumps(sample, ensure_ascii=False)+'\n', encoding='utf-8')
+            r=run('audit',invalid,'--development')
+            report=json.loads(r.stdout)
+            self.assertNotEqual(r.returncode,0)
+            self.assertTrue(any('schema validation failed' in item for item in report['errors']))
 
 if __name__=='__main__': unittest.main()

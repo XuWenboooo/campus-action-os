@@ -10,7 +10,8 @@ import { parseText, type ParserFailure } from './rule-parser.js';
 const port = Number(process.env.AI_PORT ?? 3001);
 
 function requestIdFor(request: IncomingMessage): string {
-  return request.headers['x-request-id']?.toString() || randomUUID();
+  const value = request.headers['x-request-id']?.toString().trim();
+  return value && value.length <= 200 ? value : randomUUID();
 }
 
 function send(response: ServerResponse, status: number, body: unknown, requestId: string): void {
@@ -37,7 +38,7 @@ function failureStatus(failure: ParserFailure): number {
 
 export function createParserServer(): Server {
   return createServer(async (request, response) => {
-    const requestId = requestIdFor(request);
+    let requestId = requestIdFor(request);
     try {
       if (request.url === '/health' && request.method === 'GET') {
         send(
@@ -66,6 +67,17 @@ export function createParserServer(): Server {
           );
           return;
         }
+        const suppliedRequestId = request.headers['x-request-id']?.toString().trim();
+        if (suppliedRequestId && suppliedRequestId !== valid.value.request_id) {
+          send(
+            response,
+            400,
+            createApiError('INVALID_REQUEST', 'request_id must match x-request-id', requestId),
+            requestId,
+          );
+          return;
+        }
+        if (!suppliedRequestId) requestId = valid.value.request_id;
         const parsed = parseText(valid.value);
         if ('code' in parsed) {
           send(

@@ -187,6 +187,7 @@ paths:
   /auth/dev-login:
     post:
       description: Development-only login; disabled when APP_ENV=production.
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
       requestBody:
         required: false
         content:

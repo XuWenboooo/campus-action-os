@@ -328,10 +328,23 @@ async function handle(
         403,
         'Development login is disabled in production',
       );
+    const key = idempotencyKey(request, body);
+    const hash = requestHash(body);
     const requested =
       typeof body.userId === 'string' && /^[A-Za-z0-9._:-]{1,100}$/.test(body.userId)
         ? body.userId
         : userId;
+    const previous = repository.getIdempotency(requested, path, key, hash);
+    if (previous === 'conflict')
+      throw new RepositoryError(
+        'IDEMPOTENCY_CONFLICT',
+        409,
+        'Idempotency key was reused with a different request',
+      );
+    if (previous) {
+      send(response, previous.status, previous.body, requestId);
+      return;
+    }
     let role: 'student' | 'publisher' | 'admin' = 'student';
     if (body.role !== undefined) {
       if (body.role !== 'student' && body.role !== 'publisher' && body.role !== 'admin')
@@ -345,17 +358,14 @@ async function handle(
     } else {
       repository.ensureUser(requested);
     }
-    send(
-      response,
-      200,
-      {
-        user_id: requested,
-        role: repository.getUserRole(requested),
-        access_token: `dev:${requested}`,
-        environment: options.environment ?? process.env.APP_ENV ?? 'local',
-      },
-      requestId,
-    );
+    const output = {
+      user_id: requested,
+      role: repository.getUserRole(requested),
+      access_token: `dev:${requested}`,
+      environment: options.environment ?? process.env.APP_ENV ?? 'local',
+    };
+    repository.saveIdempotency(requested, path, key, hash, 200, output);
+    send(response, 200, output, requestId);
     return;
   }
   if (request.method === 'GET' && path === '/users/me') {

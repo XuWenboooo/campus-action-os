@@ -999,12 +999,42 @@ test('publisher notice endpoints retain revision history and all side effects re
     );
     assert.equal(unauthorized.result.status, 403);
     assert.equal(unauthorized.body.error.code, 'FORBIDDEN');
-    const login = await call('POST', '/auth/dev-login', {
-      userId: 'synthetic-publisher',
-      role: 'publisher',
-    });
+    const login = await call(
+      'POST',
+      '/auth/dev-login',
+      {
+        userId: 'synthetic-publisher',
+        role: 'publisher',
+      },
+      { 'idempotency-key': 'publisher-login-1' },
+    );
     assert.equal(login.result.status, 200);
     assert.equal(login.body.role, 'publisher');
+    const loginReplay = await call(
+      'POST',
+      '/auth/dev-login',
+      { userId: 'synthetic-publisher', role: 'publisher' },
+      { 'idempotency-key': 'publisher-login-1' },
+    );
+    assert.deepEqual(loginReplay.body, login.body);
+    assert.equal(
+      (
+        repository.db
+          .prepare(
+            "SELECT count(*) AS count FROM audit_events WHERE event_type = 'auth.dev_role_set'",
+          )
+          .get() as { count: number }
+      ).count,
+      1,
+    );
+    const loginConflict = await call(
+      'POST',
+      '/auth/dev-login',
+      { userId: 'synthetic-publisher', role: 'admin' },
+      { 'idempotency-key': 'publisher-login-1' },
+    );
+    assert.equal(loginConflict.result.status, 409);
+    assert.equal(loginConflict.body.error.code, 'IDEMPOTENCY_CONFLICT');
     const noticeInput = { title: '合成发布通知', body: '请在 2099-10-01 前完成登记' };
     const created = await call('POST', '/notices', noticeInput, {
       'idempotency-key': 'notice-create-1',
@@ -1082,10 +1112,15 @@ test('notice revisions create auditable task sync proposals and require user acc
     return { result, body: result.status === 204 ? null : await result.json() };
   };
   try {
-    const login = await call('POST', '/auth/dev-login', {
-      userId: 'synthetic-sync-user',
-      role: 'publisher',
-    });
+    const login = await call(
+      'POST',
+      '/auth/dev-login',
+      {
+        userId: 'synthetic-sync-user',
+        role: 'publisher',
+      },
+      { 'idempotency-key': 'sync-login-1' },
+    );
     assert.equal(login.result.status, 200);
     const document = await call(
       'POST',

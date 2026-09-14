@@ -94,6 +94,16 @@ function evidence(id: string, sourceText: string, fieldName: Evidence['field_nam
   };
 }
 
+function deadlineLineForAction(
+  actionLine: string,
+  actionIndex: number,
+  deadlineLines: string[],
+): string | undefined {
+  if (/截止|截至|报名时间|20\d{2}[-年]/.test(actionLine)) return actionLine;
+  if (deadlineLines.length === 1) return deadlineLines[0];
+  return deadlineLines[actionIndex];
+}
+
 export function parseText(request: TextParseRequest): TextParseResponse | ParserFailure {
   const validRequest = validateTextParseRequest(request);
   if (!validRequest.ok)
@@ -128,21 +138,24 @@ export function parseText(request: TextParseRequest): TextParseResponse | Parser
     ? evidence('ev-relevance', audienceLine, 'user_relevance')
     : undefined;
   const actionInputs = findActions(lines);
-  const deadlineLine = lineFor(source, /截止|截至|前完成|报名时间|20\d{2}[-年]/);
+  const deadlineLines = lines.filter((line) => /截止|截至|前完成|报名时间|20\d{2}[-年]/.test(line));
   const materialsLine = lineFor(source, /材料|携带|提交.*(证件|证明|附件)/);
   const locationLine = lineFor(source, /地点|地址|教室|现场/);
   const platformLine = lineFor(source, /平台|系统|线上|邮箱|链接|网址/);
   const conditionLine = lineFor(source, /条件|要求|仅限|须知|须满足|如果|若/);
   const exceptionLine = lineFor(source, /除.*外|不适用于|例外/);
-  const deadline = isoDeadline(deadlineLine);
+  const actionDeadlineLines = actionInputs.map(({ line }, index) =>
+    deadlineLineForAction(line, index, deadlineLines),
+  );
+  const actionDeadlines = actionDeadlineLines.map(isoDeadline);
   const warnings: TextParseResponse['warnings'] = [];
-  if (!deadline.value)
+  if (actionDeadlines.some((deadline) => !deadline.value))
     warnings.push({
       code: 'DEADLINE_UNKNOWN',
       message: '截止时间缺失或无法安全解析，需要用户确认',
       paths: ['/verified_actions/*/deadline'],
     });
-  if (deadline.ambiguous)
+  if (actionDeadlines.some((deadline) => deadline.ambiguous))
     warnings.push({
       code: 'DEADLINE_AMBIGUOUS',
       message: '日期精度或边界语义存在歧义，需要用户确认',
@@ -162,6 +175,8 @@ export function parseText(request: TextParseRequest): TextParseResponse | Parser
     });
   const parsedActions = actionInputs.map(({ text, line }, index): VerifiedActionObject => {
     const actionId = `${request.document.document_id}:action:${index + 1}`;
+    const deadlineLine = actionDeadlineLines[index];
+    const deadline = actionDeadlines[index];
     const evidenceId = (kind: string) =>
       `${request.document.document_id}:evidence:${kind}:${index + 1}`;
     const actionRelevanceEvidence = relevanceEvidence

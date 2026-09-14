@@ -168,3 +168,19 @@ test('rule parser represents conditional actions with decision and branch graph 
   );
   assert.equal(validateTextParseResponse(result).ok, true);
 });
+
+test('rule parser preserves distinct deadlines for multi-stage actions', () => {
+  const result = parseText(
+    request(
+      '【合成多阶段通知】\n适用对象：本科生\n1. 在线提交申请\n第一阶段截止：2099-10-01 17:00 前\n2. 到现场核验材料\n第二阶段截止：2099-10-05 09:00 前',
+    ),
+  );
+  assert.equal('code' in result, false);
+  if ('code' in result) return;
+  assert.equal(result.verified_actions.length, 2);
+  assert.equal(result.verified_actions[0].deadline.value, '2099-10-01T17:00:00+08:00');
+  assert.equal(result.verified_actions[1].deadline.value, '2099-10-05T09:00:00+08:00');
+  assert.equal(result.verified_actions[0].deadline.evidence_ids.length, 1);
+  assert.equal(result.verified_actions[1].deadline.evidence_ids.length, 1);
+  assert.equal(validateTextParseResponse(result).ok, true);
+});

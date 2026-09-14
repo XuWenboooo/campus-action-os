@@ -1,0 +1,12 @@
+node_modules
+dist
+coverage
+*.lock
+benchmark
+schemas
+examples
+proposals
+tools
+CODEX_HANDOFF_SUMMARY.md
+
+.pytest_cache

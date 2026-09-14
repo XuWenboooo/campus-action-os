@@ -5,6 +5,7 @@ import {
   loadSchema,
   protocolVersion,
   validateActionGraph,
+  validateTextParseResponse,
   validateVerifiedActionObject,
 } from '@campus-action-os/protocol';
 
@@ -102,6 +103,44 @@ test('runtime validator accepts a typed action and rejects unsafe variants', () 
   assert.equal(validateVerifiedActionObject(stringNull).ok, false);
   const missingEvidence = { ...validAction, evidence: [] };
   assert.equal(validateVerifiedActionObject(missingEvidence).ok, false);
+  const unknownPrecisionWithValue = {
+    ...validAction,
+    deadline: { ...validAction.deadline, precision: 'unknown' as const },
+  };
+  assert.equal(validateVerifiedActionObject(unknownPrecisionWithValue).ok, false);
+  const danglingDependency = {
+    ...validAction,
+    dependencies: [
+      {
+        dependency_id: 'd1',
+        from_step_id: 'missing',
+        to_step_id: 's1',
+        type: 'blocks' as const,
+      },
+    ],
+  };
+  assert.equal(validateVerifiedActionObject(danglingDependency).ok, false);
+  const conflictedActiveTask = {
+    ...validAction,
+    verification_status: 'conflict' as const,
+    task_status: 'completed' as const,
+  };
+  assert.equal(validateVerifiedActionObject(conflictedActiveTask).ok, false);
+  const explicitNullLocation = {
+    ...validAction,
+    evidence: [
+      ...validAction.evidence,
+      {
+        evidence_id: 'e4',
+        source_text: '地点待定',
+        page_or_image: 'p1',
+        field_name: 'location' as const,
+        epistemic_status: 'explicit' as const,
+      },
+    ],
+    field_status: { ...validAction.field_status, location: 'explicit' as const },
+  };
+  assert.equal(validateVerifiedActionObject(explicitNullLocation).ok, false);
 });
 
 test('runtime graph validator rejects dangling and execution-cycle graphs', () => {
@@ -128,4 +167,43 @@ test('runtime graph validator rejects dangling and execution-cycle graphs', () =
     ],
   };
   assert.equal(validateActionGraph(cycle).ok, false);
+});
+
+test('runtime response validator keeps verified actions and graph actions consistent', () => {
+  const response = {
+    schema_version: 'text-parse-response/v1',
+    request_id: 'req-graph-consistency',
+    document_id: 'doc-test',
+    status: 'succeeded',
+    document_assessment: {
+      schema_version: 'document-assessment/v1',
+      document_id: 'doc-test',
+      user_relevance: 'relevant',
+      relevance_reason: '画像匹配',
+      evidence: [{ evidence_id: 'e3', source_text: '学生', field_name: 'user_relevance' }],
+      verification_status: 'passed',
+    },
+    verified_actions: [validAction],
+    action_graph: {
+      schema_version: 'action-graph/v1',
+      graph_id: 'g-test',
+      nodes: [{ node_id: 'node-1', node_type: 'action', action_id: 'other-action' }],
+      edges: [],
+    },
+    warnings: [],
+    parser_metadata: {
+      parser_version: 'test/1.0.0',
+      model_provider: 'test',
+      model_version: 'test',
+      prompt_version: 'test',
+      rule_version: 'test',
+      ocr_version: 'not_applicable',
+      started_at: '2099-01-01T00:00:00.000Z',
+      completed_at: '2099-01-01T00:00:00.000Z',
+      latency_ms: 0,
+    },
+  };
+  const validation = validateTextParseResponse(response);
+  assert.equal(validation.ok, false);
+  if (!validation.ok) assert.ok(validation.errors.some((error) => error.keyword === 'consistency'));
 });

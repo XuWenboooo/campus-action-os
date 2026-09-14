@@ -108,7 +108,10 @@ function contentType(value: unknown): Document['content_type'] {
 
 const maxBinaryUploadBytes = 800_000;
 
-function binaryUpload(value: unknown): Uint8Array {
+function binaryUpload(
+  value: unknown,
+  contentTypeValue: 'image/png' | 'application/pdf',
+): Uint8Array {
   if (typeof value !== 'string' || value.length === 0 || value.length % 4 !== 0)
     throw new RepositoryError('INVALID_REQUEST', 400, 'content_base64 must be canonical Base64');
   if (!/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(value))
@@ -122,6 +125,18 @@ function binaryUpload(value: unknown): Uint8Array {
     );
   if (content.toString('base64') !== value)
     throw new RepositoryError('INVALID_REQUEST', 400, 'content_base64 must be canonical Base64');
+  const isPng =
+    contentTypeValue === 'image/png' &&
+    Buffer.from(content.subarray(0, 8)).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]));
+  const isPdf =
+    contentTypeValue === 'application/pdf' &&
+    Buffer.from(content.subarray(0, 5)).toString('ascii') === '%PDF-';
+  if (!isPng && !isPdf)
+    throw new RepositoryError(
+      'INVALID_REQUEST',
+      400,
+      'content_base64 bytes do not match the declared media type',
+    );
   return content;
 }
 
@@ -374,7 +389,7 @@ async function handle(
       uploaded &&
       (documentContentType === 'image/png' || documentContentType === 'application/pdf')
     ) {
-      sourceContent = binaryUpload(body.content_base64);
+      sourceContent = binaryUpload(body.content_base64, documentContentType);
       text = stringField(body, 'text', false) ?? '';
     } else {
       if (uploaded && body.content_base64 !== undefined)

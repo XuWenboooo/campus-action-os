@@ -82,6 +82,33 @@ test('Error Shield catches unsupported explicit claims and side-effect states', 
   assert.ok(errors.some((error) => error.code === 'TASK_SIDE_EFFECT_BLOCKED'));
 });
 
+test('Error Shield catches unsafe deadline precision, conflicts, and dangling references', () => {
+  const result = parseText(
+    request('【合成通知】\n适用对象：本科生\n1. 提交材料\n截止：2099-10-03 17:00 前'),
+  );
+  assert.equal('code' in result, false);
+  if ('code' in result) return;
+  const base = result.verified_actions[0];
+  const unsafe = {
+    ...base,
+    deadline: { ...base.deadline, precision: 'unknown' as const },
+    verification_status: 'conflict' as const,
+    task_status: 'completed' as const,
+    dependencies: [
+      {
+        dependency_id: 'dangling',
+        from_step_id: 'missing-step',
+        to_step_id: base.steps[0].step_id,
+        type: 'blocks' as const,
+      },
+    ],
+  };
+  const errors = inspectCriticalErrors(unsafe);
+  assert.ok(errors.some((error) => error.code === 'DEADLINE_UNSAFE'));
+  assert.ok(errors.some((error) => error.code === 'CONFLICTING_STATE'));
+  assert.ok(errors.some((error) => error.code === 'DANGLING_REFERENCE'));
+});
+
 test('document normalizer converts HTML and refuses media without configured OCR', async () => {
   const html = await normalizeDocument({
     schema_version: 'document/v1',

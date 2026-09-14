@@ -20,5 +20,7 @@
 - 收紧输入来源边界：`data_origin` 只接受 `synthetic` 或 `user_provided`，未知值统一拒绝且不写入文档。
 - 为 Action/Task 的 PATCH 副作用增加 scoped 幂等键和严格字段校验，重复请求不重复追加审计/状态事件，错误字段不再静默返回成功。
 - 将 `/documents/upload` 从文本别名升级为受限二进制入口：图片/PDF Base64 与文档记录在 SQLite 同一事务中保存，重开数据库后仍可取回原始字节，并传入受控 OCR Provider；未配置 Provider 仍明确失败。
+- 加强共享 Error Shield 与协议语义校验：拒绝未知精度却带值的截止时间、冲突行动的 active/completed 状态、悬空 Evidence/步骤/条件/依赖引用、重复 Evidence ID、显式空地点/平台及响应图谱与行动集合不一致。
+- 为二进制入口增加 PNG/PDF magic-byte 校验，避免仅凭请求 MIME 声明接受错误格式。
 
 仍为 `NOT_READY`：真实 OCR/provider、正式 800 条冻结评测、微信开发者工具人工验证、真实认证/提醒和生产部署均缺失；本地测试不能替代这些证据。

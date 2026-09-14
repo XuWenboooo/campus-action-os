@@ -477,6 +477,19 @@ test('API persists binary media uploads and passes source bytes to a controlled 
     assert.equal(malformedContent.status, 400);
     assert.equal(malformedBody.error.code, 'INVALID_REQUEST');
 
+    const mismatchedContent = await fetch(`${url}/documents/upload`, {
+      method: 'POST',
+      headers: { ...headers, 'idempotency-key': 'binary-mismatched-1' },
+      body: JSON.stringify({
+        contentType: 'application/pdf',
+        content_base64: raw.toString('base64'),
+        data_origin: 'synthetic',
+      }),
+    });
+    const mismatchedBody = await mismatchedContent.json();
+    assert.equal(mismatchedContent.status, 400);
+    assert.equal(mismatchedBody.error.code, 'INVALID_REQUEST');
+
     const uploaded = await fetch(`${url}/documents/upload`, {
       method: 'POST',
       headers: { ...headers, 'idempotency-key': 'binary-upload-1' },

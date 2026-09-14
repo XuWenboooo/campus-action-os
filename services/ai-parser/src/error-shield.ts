@@ -5,6 +5,8 @@ export type CriticalError = {
     | 'MISSING_EVIDENCE'
     | 'DEADLINE_UNSAFE'
     | 'UNSUPPORTED_CLAIM'
+    | 'CONFLICTING_STATE'
+    | 'DANGLING_REFERENCE'
     | 'ACTION_NOT_CONFIRMABLE'
     | 'TASK_SIDE_EFFECT_BLOCKED';
   field: string;
@@ -45,6 +47,15 @@ export function inspectCriticalErrors(action: VerifiedActionObject): CriticalErr
       message: '截止时间未知，禁止自动创建可执行任务',
     });
   }
+  if (
+    action.verification_status === 'conflict' &&
+    ['in_progress', 'completed'].includes(action.task_status)
+  )
+    errors.push({
+      code: 'CONFLICTING_STATE',
+      field: 'task_status',
+      message: '冲突行动不能保持进行中或已完成的任务状态',
+    });
   if (action.deadline.value !== null && action.deadline.evidence_ids.length === 0) {
     errors.push({
       code: 'UNSUPPORTED_CLAIM',
@@ -55,14 +66,39 @@ export function inspectCriticalErrors(action: VerifiedActionObject): CriticalErr
   const evidenceIds = new Set(action.evidence.map((item) => item.evidence_id));
   const referencedIds = [
     ...action.deadline.evidence_ids,
-    ...action.steps.flatMap((step) => step.evidence_ids),
+    ...action.steps.flatMap((step) => [
+      ...step.evidence_ids,
+      ...(step.location?.evidence_ids ?? []),
+      ...(step.platform?.evidence_ids ?? []),
+      ...(step.required_materials ?? []).flatMap((material) => material.evidence_ids),
+    ]),
     ...action.required_materials.flatMap((material) => material.evidence_ids),
+    ...(action.location?.evidence_ids ?? []),
+    ...(action.platform?.evidence_ids ?? []),
+    ...(action.entry_link?.evidence_ids ?? []),
+    ...(action.consequence?.evidence_ids ?? []),
+    ...action.conditions.flatMap((condition) => condition.evidence_ids),
+    ...action.exceptions.flatMap((exception) => exception.evidence_ids),
   ];
-  if (referencedIds.some((id) => !evidenceIds.has(id))) {
+  const stepIds = new Set(action.steps.map((step) => step.step_id));
+  const conditionIds = new Set(action.conditions.map((condition) => condition.condition_id));
+  const invalidDependency = action.dependencies.some(
+    (dependency) =>
+      !stepIds.has(dependency.from_step_id) ||
+      !stepIds.has(dependency.to_step_id) ||
+      (dependency.condition_id !== undefined && !conditionIds.has(dependency.condition_id)),
+  );
+  const invalidOutcome = action.conditions.some((condition) =>
+    condition.outcomes.some((outcome) => outcome.step_ids.some((stepId) => !stepIds.has(stepId))),
+  );
+  if (referencedIds.some((id) => !evidenceIds.has(id)) || invalidDependency || invalidOutcome) {
     errors.push({
-      code: 'UNSUPPORTED_CLAIM',
-      field: 'evidence_ids',
-      message: '行动引用了不存在的证据 ID',
+      code: invalidDependency || invalidOutcome ? 'DANGLING_REFERENCE' : 'UNSUPPORTED_CLAIM',
+      field: invalidDependency || invalidOutcome ? 'dependencies' : 'evidence_ids',
+      message:
+        invalidDependency || invalidOutcome
+          ? '行动包含悬空步骤、条件或依赖引用'
+          : '行动引用了不存在的证据 ID',
     });
   }
   if (action.task_status !== 'pending' && action.result_stage !== 'user_confirmed') {

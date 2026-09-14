@@ -435,7 +435,103 @@ function semanticErrors(action: VerifiedActionObject): ValidationError[] {
       message: 'null deadline requires unknown precision',
     });
   }
+  if (action.deadline.value !== null && action.deadline.precision === 'unknown') {
+    errors.push({
+      path: '/deadline/value',
+      keyword: 'semantic',
+      message: 'unknown deadline precision requires null value',
+    });
+  }
+  if (
+    action.verification_status === 'conflict' &&
+    ['in_progress', 'completed'].includes(action.task_status)
+  ) {
+    errors.push({
+      path: '/task_status',
+      keyword: 'semantic',
+      message: 'conflicted action cannot have an active or completed task',
+    });
+  }
   const evidence = new Set(action.evidence.map((item) => item.field_name));
+  const evidenceIds = new Set<string>();
+  for (const [index, item] of action.evidence.entries()) {
+    if (evidenceIds.has(item.evidence_id))
+      errors.push({
+        path: `/evidence/${index}/evidence_id`,
+        keyword: 'unique',
+        message: 'evidence_id must be unique within an action',
+      });
+    evidenceIds.add(item.evidence_id);
+  }
+  const checkEvidenceRefs = (ids: string[], path: string): void => {
+    for (const [index, id] of ids.entries()) {
+      if (!evidenceIds.has(id))
+        errors.push({
+          path: `${path}/${index}`,
+          keyword: 'reference',
+          message: 'evidence reference must point to an existing evidence item',
+        });
+    }
+  };
+  const checkClaim = (claim: Claim | null, path: string): void => {
+    if (claim) checkEvidenceRefs(claim.evidence_ids, `${path}/evidence_ids`);
+  };
+  checkEvidenceRefs(action.deadline.evidence_ids, '/deadline/evidence_ids');
+  checkClaim(action.location, '/location');
+  checkClaim(action.platform, '/platform');
+  checkClaim(action.entry_link, '/entry_link');
+  checkClaim(action.consequence, '/consequence');
+  for (const field of ['location', 'platform'] as const) {
+    if (action[field] === null && action.field_status[field] === 'explicit')
+      errors.push({
+        path: `/field_status/${field}`,
+        keyword: 'semantic',
+        message: `null ${field} cannot be explicit`,
+      });
+  }
+  const stepIds = new Set(action.steps.map((step) => step.step_id));
+  for (const [index, step] of action.steps.entries()) {
+    checkEvidenceRefs(step.evidence_ids, `/steps/${index}/evidence_ids`);
+    checkClaim(step.location ?? null, `/steps/${index}/location`);
+    checkClaim(step.platform ?? null, `/steps/${index}/platform`);
+    for (const [materialIndex, material] of (step.required_materials ?? []).entries())
+      checkEvidenceRefs(
+        material.evidence_ids,
+        `/steps/${index}/required_materials/${materialIndex}/evidence_ids`,
+      );
+  }
+  checkEvidenceRefs(
+    action.required_materials.flatMap((material) => material.evidence_ids),
+    '/required_materials/evidence_ids',
+  );
+  const conditionIds = new Set(action.conditions.map((condition) => condition.condition_id));
+  for (const [index, dependency] of action.dependencies.entries()) {
+    if (!stepIds.has(dependency.from_step_id) || !stepIds.has(dependency.to_step_id))
+      errors.push({
+        path: `/dependencies/${index}`,
+        keyword: 'reference',
+        message: 'dependency step reference must point to an existing step',
+      });
+    if (dependency.condition_id && !conditionIds.has(dependency.condition_id))
+      errors.push({
+        path: `/dependencies/${index}/condition_id`,
+        keyword: 'reference',
+        message: 'dependency condition reference must point to an existing condition',
+      });
+  }
+  for (const [index, condition] of action.conditions.entries()) {
+    checkEvidenceRefs(condition.evidence_ids, `/conditions/${index}/evidence_ids`);
+    for (const [outcomeIndex, outcome] of condition.outcomes.entries())
+      for (const [stepIndex, stepId] of outcome.step_ids.entries())
+        if (!stepIds.has(stepId))
+          errors.push({
+            path: `/conditions/${index}/outcomes/${outcomeIndex}/step_ids/${stepIndex}`,
+            keyword: 'reference',
+            message: 'condition outcome must point to an existing step',
+          });
+  }
+  for (const [index, exception] of action.exceptions.entries())
+    checkEvidenceRefs(exception.evidence_ids, `/exceptions/${index}/evidence_ids`);
   const evidenceField: Record<
     keyof FieldStatus,
     Evidence['field_name'] | Evidence['field_name'][]
@@ -658,6 +754,30 @@ export function validateTextParseResponse(
   if (response.action_graph !== null) {
     const graph = validateActionGraph(response.action_graph, rootDir);
     if (!graph.ok) errors.push(...prefixedErrors('/action_graph', graph.errors));
+    else {
+      const responseActionIds = new Set(
+        response.verified_actions.map((action) => action.action_id),
+      );
+      const graphActionIds = new Set(
+        graph.value.nodes
+          .filter((node) => node.node_type === 'action')
+          .map((node) => node.action_id as string),
+      );
+      for (const actionId of graphActionIds)
+        if (!responseActionIds.has(actionId))
+          errors.push({
+            path: '/action_graph/nodes',
+            keyword: 'consistency',
+            message: 'action graph references an action absent from verified_actions',
+          });
+      for (const actionId of responseActionIds)
+        if (!graphActionIds.has(actionId))
+          errors.push({
+            path: '/action_graph/nodes',
+            keyword: 'consistency',
+            message: 'verified action is absent from action graph',
+          });
+    }
   }
   if (response.document_assessment.document_id !== response.document_id) {
     errors.push({

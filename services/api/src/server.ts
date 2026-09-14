@@ -17,7 +17,12 @@ const port = Number(process.env.API_PORT ?? 3000);
 const parserUrl = process.env.AI_SERVICE_URL ?? 'http://localhost:3001';
 
 type Body = Record<string, unknown>;
-type ApiServerOptions = { repository?: Repository; parserUrl?: string; environment?: string };
+type ApiServerOptions = {
+  repository?: Repository;
+  parserUrl?: string;
+  environment?: string;
+  requestTimeoutMs?: number;
+};
 
 function requestIdFor(request: IncomingMessage): string {
   const value = request.headers['x-request-id']?.toString().trim();
@@ -102,20 +107,31 @@ async function parserRequest(
   url: string,
   requestId: string,
   input: unknown,
+  timeoutMs: number,
 ): Promise<{ status: number; body: unknown }> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const result = await fetch(`${url.replace(/\/$/, '')}/v1/parse`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'x-request-id': requestId },
       body: JSON.stringify(input),
+      signal: controller.signal,
     });
     const body = await result.json().catch(() => null);
     return { status: result.status, body };
-  } catch {
+  } catch (error) {
+    if (error instanceof Error && error.name === 'AbortError')
+      return {
+        status: 504,
+        body: createApiError('PARSER_TIMEOUT', 'AI parser request timed out', requestId, true),
+      };
     return {
       status: 503,
       body: createApiError('PARSER_NOT_CONFIGURED', 'AI parser service is unavailable', requestId),
     };
+  } finally {
+    clearTimeout(timeout);
   }
 }
 
@@ -132,6 +148,7 @@ async function parseDocument(
   parseJobId: string,
   requestId: string,
   parserBaseUrl: string,
+  options: ApiServerOptions,
 ): Promise<void> {
   const normalized = normalizeDocument(document);
   if (!normalized.ok) {
@@ -168,12 +185,20 @@ async function parseDocument(
     },
     user_profile: profile,
     execution_context: {
-      environment: process.env.APP_ENV === 'production' ? 'production' : 'local',
+      environment:
+        (options.environment ?? process.env.APP_ENV ?? 'local') === 'production'
+          ? 'production'
+          : 'local',
       deadline_ms: Number(process.env.API_REQUEST_TIMEOUT_MS ?? 5000),
       requested_at: new Date().toISOString(),
     },
   };
-  const result = await parserRequest(parserBaseUrl, requestId, input);
+  const result = await parserRequest(
+    parserBaseUrl,
+    requestId,
+    input,
+    options.requestTimeoutMs ?? Number(process.env.API_REQUEST_TIMEOUT_MS ?? 5000),
+  );
   if (result.status < 200 || result.status >= 300) {
     repository.failParseJob(userId, parseJobId, result.body, requestId);
     return;
@@ -208,7 +233,23 @@ async function handle(
     .split('/')
     .filter(Boolean)
     .map((part) => decodeURIComponent(part));
-  const userId = currentUser(request, repository);
+  const environment = options.environment ?? process.env.APP_ENV ?? 'local';
+  const publicHealthRoute =
+    request.method === 'GET' &&
+    (path === '/health' || path === '/ready' || path === '/v1/capabilities');
+  const devLoginRoute = request.method === 'POST' && path === '/auth/dev-login';
+  const publicRoute = publicHealthRoute || devLoginRoute;
+  if (environment === 'production' && !publicRoute)
+    throw new RepositoryError(
+      'AUTH_NOT_CONFIGURED',
+      503,
+      'Production identity authentication is not configured for this local service',
+      true,
+    );
+  const userId =
+    publicHealthRoute || (environment === 'production' && devLoginRoute)
+      ? 'anonymous'
+      : currentUser(request, repository);
   const body = request.method === 'GET' ? {} : bodyObject(await readJson(request));
   const parserBaseUrl = options.parserUrl ?? parserUrl;
 
@@ -353,7 +394,15 @@ async function handle(
     const job = repository.createParseJob(userId, document.document_id, requestId, key);
     if (!job.existed) {
       repository.startParseJob(userId, job.parseJobId, requestId);
-      await parseDocument(repository, userId, document, job.parseJobId, requestId, parserBaseUrl);
+      await parseDocument(
+        repository,
+        userId,
+        document,
+        job.parseJobId,
+        requestId,
+        parserBaseUrl,
+        options,
+      );
     }
     send(response, 202, jobResponse(repository, userId, job.parseJobId), requestId);
     return;

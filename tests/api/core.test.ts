@@ -1,13 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { createParserServer } from '../../services/ai-parser/src/server.js';
 import { createApiServer } from '../../services/api/src/server.js';
 import { Repository } from '../../services/api/src/repository.js';
 
-async function listen(
-  server: ReturnType<typeof createParserServer> | ReturnType<typeof createApiServer>['server'],
-): Promise<string> {
+async function listen(server: Server): Promise<string> {
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
   const address = server.address() as AddressInfo;
   return `http://127.0.0.1:${address.port}`;
@@ -239,6 +238,42 @@ test('API persists parser outage as a failed ParseJob instead of a fake success'
   }
 });
 
+test('API aborts a stalled parser request and persists PARSER_TIMEOUT', async () => {
+  const slowParser = createServer((_request, response) => {
+    setTimeout(() => response.writeHead(200).end('{}'), 200);
+  });
+  const slowUrl = await listen(slowParser);
+  const repository = new Repository(':memory:');
+  const api = createApiServer({ repository, parserUrl: slowUrl, requestTimeoutMs: 20 });
+  const url = await listen(api.server);
+  const headers = { 'content-type': 'application/json', 'x-dev-user-id': 'timeout-student' };
+  try {
+    const documentResponse = await fetch(`${url}/documents`, {
+      method: 'POST',
+      headers: { ...headers, 'idempotency-key': 'timeout-doc-1' },
+      body: JSON.stringify({ text: '适用对象：本科生\n1. 提交材料', data_origin: 'synthetic' }),
+    });
+    const documentBody = await documentResponse.json();
+    const parseResponse = await fetch(
+      `${url}/documents/${documentBody.document.document_id}/parse`,
+      {
+        method: 'POST',
+        headers: { ...headers, 'idempotency-key': 'timeout-parse-1' },
+        body: '{}',
+      },
+    );
+    const parseBody = await parseResponse.json();
+    assert.equal(parseResponse.status, 202);
+    assert.equal(parseBody.status, 'failed');
+    assert.equal(parseBody.error.code, 'PARSER_TIMEOUT');
+    assert.equal(parseBody.error.retryable, true);
+  } finally {
+    await close(api.server);
+    await close(slowParser);
+    repository.close();
+  }
+});
+
 test('API persists an explicit OCR degradation for image input', async () => {
   const repository = new Repository(':memory:');
   const api = createApiServer({ repository, parserUrl: 'http://127.0.0.1:1' });
@@ -328,6 +363,10 @@ test('production mode rejects dev login', async () => {
     const body = await result.json();
     assert.equal(result.status, 403);
     assert.equal(body.error.code, 'DEV_LOGIN_DISABLED');
+    const protectedRoute = await fetch(`${url}/users/me`, { headers: { 'x-dev-user-id': 'fake' } });
+    const protectedBody = await protectedRoute.json();
+    assert.equal(protectedRoute.status, 503);
+    assert.equal(protectedBody.error.code, 'AUTH_NOT_CONFIGURED');
   } finally {
     await close(api.server);
     repository.close();

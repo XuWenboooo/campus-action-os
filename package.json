@@ -15,6 +15,7 @@
     "format:check": "prettier --check .",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
+    "check:miniapp": "node scripts/check-miniapp.mjs",
     "test": "node --test --import tsx tests/**/*.test.ts",
     "build": "tsc -p tsconfig.build.json && node scripts/copy-schemas.mjs",
     "test:built": "node scripts/test-built-protocol.mjs",
@@ -38,7 +39,7 @@
     "release:m2-manifest:verify": "node scripts/m2-manifest.mjs",
     "release:manifest:verify": "node scripts/m1-manifest.mjs verify",
     "diff:check": "git diff --check",
-    "check": "npm run format:check && npm run lint && npm run typecheck && npm run test && npm run build && npm run test:built && npm run scan:secrets && npm run test:python && npm run release:m2-manifest:verify && npm run release:manifest:verify && npm run diff:check",
+    "check": "npm run format:check && npm run lint && npm run typecheck && npm run check:miniapp && npm run test && npm run build && npm run test:built && npm run scan:secrets && npm run test:python && npm run release:m2-manifest:verify && npm run release:manifest:verify && npm run diff:check",
     "scan:secrets": "node scripts/scan-secrets.mjs",
     "dev:api": "tsx services/api/src/server.ts",
     "dev:ai": "tsx services/ai-parser/src/server.ts"

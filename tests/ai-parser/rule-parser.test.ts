@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { validateTextParseResponse, type TextParseRequest } from '@campus-action-os/protocol';
 import { inspectCriticalErrors } from '../../services/ai-parser/src/error-shield.js';
+import { normalizeDocument } from '../../services/ai-parser/src/document-normalizer.js';
 import { parseText } from '../../services/ai-parser/src/rule-parser.js';
 
 function request(
@@ -79,4 +80,40 @@ test('Error Shield catches unsupported explicit claims and side-effect states', 
   const errors = inspectCriticalErrors(unsafe);
   assert.ok(errors.some((error) => error.code === 'MISSING_EVIDENCE'));
   assert.ok(errors.some((error) => error.code === 'TASK_SIDE_EFFECT_BLOCKED'));
+});
+
+test('document normalizer converts HTML and refuses media without configured OCR', () => {
+  const html = normalizeDocument({
+    schema_version: 'document/v1',
+    document_id: 'synthetic-html',
+    owner_user_id: 'synthetic-user',
+    title: 'HTML notice',
+    content_type: 'text/html',
+    text: '<h1>合成通知</h1><p>1. 提交材料<br>截止：2099-10-03 前</p>',
+    content_sha256: '0'.repeat(64),
+    data_origin: 'synthetic',
+    created_at: '2099-01-01T00:00:00.000Z',
+  });
+  assert.equal(html.ok, true);
+  if (html.ok) {
+    assert.match(html.text, /合成通知/);
+    assert.match(html.text, /提交材料/);
+    assert.equal(html.source, 'html_text');
+  }
+  const image = normalizeDocument({
+    schema_version: 'document/v1',
+    document_id: 'synthetic-image',
+    owner_user_id: 'synthetic-user',
+    title: 'Image notice',
+    content_type: 'image/png',
+    text: '不可未经 OCR 直接使用',
+    content_sha256: '0'.repeat(64),
+    data_origin: 'synthetic',
+    created_at: '2099-01-01T00:00:00.000Z',
+  });
+  assert.deepEqual(image, {
+    ok: false,
+    code: 'OCR_NOT_CONFIGURED',
+    message: '图片/PDF 需要经过已配置并可审计的 OCR/版面解析器；当前环境未启用该能力',
+  });
 });

@@ -1,0 +1,7 @@
+<view class="page">
+  <view class="title">用户画像</view>
+  <view class="muted">画像只用于相关性匹配；当前为本地开发登录。</view>
+  <input value="{{educationLevel}}" placeholder="教育阶段，例如：本科生" bindinput="onEducationInput" />
+  <button class="button" loading="{{loading}}" bindtap="save">保存画像</button>
+  <view class="danger" wx:if="{{error}}">{{error}}</view>
+</view>

@@ -1,0 +1,12 @@
+<view class="page">
+  <view class="title">设置与隐私</view>
+  <view class="card">
+    <view>本地开发状态</view>
+    <view class="muted">DEV_ONLY 登录；API 地址来自 app.js；客户端不保存模型密钥。</view>
+  </view>
+  <view class="card">
+    <view>人工验收状态</view>
+    <view class="danger">MANUAL_VERIFICATION_REQUIRED</view>
+    <view class="muted">请按 docs/manual-wechat-verification.md 在微信开发者工具中逐项验证。</view>
+  </view>
+</view>

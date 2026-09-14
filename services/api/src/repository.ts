@@ -4,10 +4,14 @@ import { migrateDatabase } from '../../../database/migrate.js';
 import {
   validateDocument,
   validateNotificationRevision,
+  validateParseJob,
   validateTask,
+  validateUserProfile,
   validateVerifiedActionObject,
+  type ApiError,
   type Document,
   type NotificationRevision,
+  type ParseJob,
   type PublicUserProfile,
   type Task,
   type TextParseResponse,
@@ -46,7 +50,7 @@ function now(): string {
 }
 
 function documentFromRow(row: Row): Document {
-  return {
+  const document: Document = {
     schema_version: 'document/v1',
     document_id: text(row.document_id),
     owner_user_id: text(row.owner_user_id),
@@ -57,10 +61,77 @@ function documentFromRow(row: Row): Document {
     data_origin: row.data_origin as Document['data_origin'],
     created_at: text(row.created_at),
   };
+  const valid = validateDocument(document);
+  if (!valid.ok)
+    throw new RepositoryError('DATA_CORRUPTION', 500, 'Stored document failed schema validation');
+  return valid.value;
 }
 
 function actionFromRow(row: Row): VerifiedActionObject {
-  return parseJson<VerifiedActionObject>(row.payload_json);
+  const valid = validateVerifiedActionObject(parseJson<VerifiedActionObject>(row.payload_json));
+  if (!valid.ok)
+    throw new RepositoryError('DATA_CORRUPTION', 500, 'Stored action failed schema validation');
+  return valid.value;
+}
+
+function insertActionChanges(db: DatabaseSync, action: VerifiedActionObject): void {
+  const statement = db.prepare(
+    'INSERT OR IGNORE INTO action_change_history (change_id, action_id, occurred_at, actor, change_type, reason, previous_action_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
+  );
+  for (const change of action.change_history) {
+    statement.run(
+      change.change_id,
+      action.action_id,
+      change.occurred_at,
+      change.actor,
+      change.change_type,
+      change.reason,
+      change.previous_action_id ?? null,
+    );
+  }
+}
+
+function normalizedError(value: unknown, requestId: string): ApiError['error'] {
+  const candidate =
+    typeof value === 'object' && value !== null && 'error' in value
+      ? (value as { error: unknown }).error
+      : value;
+  if (
+    typeof candidate === 'object' &&
+    candidate !== null &&
+    typeof (candidate as Record<string, unknown>).code === 'string' &&
+    typeof (candidate as Record<string, unknown>).message === 'string' &&
+    typeof (candidate as Record<string, unknown>).retryable === 'boolean'
+  ) {
+    return {
+      code: (candidate as Record<string, string>).code,
+      message: (candidate as Record<string, string>).message,
+      requestId:
+        typeof (candidate as Record<string, unknown>).requestId === 'string'
+          ? String((candidate as Record<string, unknown>).requestId)
+          : requestId,
+      retryable: Boolean((candidate as Record<string, unknown>).retryable),
+    };
+  }
+  if (
+    typeof candidate === 'object' &&
+    candidate !== null &&
+    typeof (candidate as Record<string, unknown>).code === 'string' &&
+    typeof (candidate as Record<string, unknown>).message === 'string'
+  ) {
+    return {
+      code: String((candidate as Record<string, unknown>).code),
+      message: String((candidate as Record<string, unknown>).message),
+      requestId,
+      retryable: false,
+    };
+  }
+  return {
+    code: 'PARSER_REJECTED',
+    message: 'Parser failed without a valid error object',
+    requestId,
+    retryable: false,
+  };
 }
 
 function taskFromRow(row: Row): Task {
@@ -122,12 +193,16 @@ export class Repository {
     const row = this.db
       .prepare('SELECT profile_json, updated_at FROM user_profiles WHERE user_id = ?')
       .get(userId) as Row;
-    return {
+    const profile: PublicUserProfile = {
       schema_version: 'user-profile/v1',
       profile_id: userId,
       ...parseJson<UserProfile>(row.profile_json),
       updated_at: text(row.updated_at),
     };
+    const valid = validateUserProfile(profile);
+    if (!valid.ok)
+      throw new RepositoryError('DATA_CORRUPTION', 500, 'Stored profile failed schema validation');
+    return valid.value;
   }
 
   updateProfile(userId: string, profile: UserProfile): PublicUserProfile {
@@ -141,15 +216,23 @@ export class Repository {
     } = current;
     const merged = { ...currentFields, ...profile };
     const updatedAt = now();
-    this.db
-      .prepare('UPDATE user_profiles SET profile_json = ?, updated_at = ? WHERE user_id = ?')
-      .run(json(merged), updatedAt, userId);
-    return {
+    const candidate: PublicUserProfile = {
       schema_version: 'user-profile/v1',
       profile_id: userId,
       ...merged,
       updated_at: updatedAt,
     };
+    const valid = validateUserProfile(candidate);
+    if (!valid.ok)
+      throw new RepositoryError(
+        'INVALID_PROFILE',
+        400,
+        valid.errors[0]?.message ?? 'Invalid user profile',
+      );
+    this.db
+      .prepare('UPDATE user_profiles SET profile_json = ?, updated_at = ? WHERE user_id = ?')
+      .run(json(merged), updatedAt, userId);
+    return valid.value;
   }
 
   createDocument(input: CreateDocumentInput): Document {
@@ -255,24 +338,45 @@ export class Repository {
     return { parseJobId, existed: false };
   }
 
-  getParseJob(userId: string, parseJobId: string): Row | null {
+  getParseJob(userId: string, parseJobId: string): ParseJob | null {
     const row = this.db
       .prepare('SELECT * FROM parse_jobs WHERE parse_job_id = ? AND user_id = ?')
       .get(parseJobId, userId) as Row | undefined;
     if (!row) return null;
-    return {
+    const job: ParseJob = {
       schema_version: 'parse-job/v1',
       parse_job_id: text(row.parse_job_id),
       document_id: text(row.document_id),
       user_id: text(row.user_id),
       request_id: text(row.request_id),
       idempotency_key: text(row.idempotency_key),
-      status: row.status,
+      status: row.status as ParseJob['status'],
       result: row.result_json ? parseJson<TextParseResponse>(row.result_json) : null,
-      error: row.error_json ? parseJson<unknown>(row.error_json) : null,
+      error: row.error_json ? parseJson<ApiError['error']>(row.error_json) : null,
       created_at: text(row.created_at),
       updated_at: text(row.updated_at),
     };
+    const valid = validateParseJob(job);
+    if (!valid.ok)
+      throw new RepositoryError(
+        'DATA_CORRUPTION',
+        500,
+        'Stored parse job failed schema validation',
+      );
+    return valid.value;
+  }
+
+  startParseJob(userId: string, parseJobId: string, requestId: string): void {
+    const result = this.db
+      .prepare(
+        "UPDATE parse_jobs SET status = 'running', updated_at = ? WHERE parse_job_id = ? AND user_id = ? AND status = 'queued'",
+      )
+      .run(now(), parseJobId, userId);
+    if (Number(result.changes) !== 1)
+      throw new RepositoryError('PARSE_JOB_NOT_FOUND', 404, 'Queued parse job not found');
+    this.recordAudit(requestId, userId, 'parse_job.started', 'parse_job', parseJobId, {
+      status: 'running',
+    });
   }
 
   completeParseJob(
@@ -334,6 +438,7 @@ export class Repository {
               evidence.epistemic_status,
             );
         }
+        insertActionChanges(this.db, action);
       }
       if (response.action_graph) {
         this.db
@@ -360,10 +465,7 @@ export class Repository {
 
   failParseJob(userId: string, parseJobId: string, error: unknown, requestId: string): void {
     const timestamp = now();
-    const storedError =
-      typeof error === 'object' && error !== null && 'error' in error
-        ? (error as { error: unknown }).error
-        : error;
+    const storedError = normalizedError(error, requestId);
     const result = this.db
       .prepare(
         'UPDATE parse_jobs SET status = ?, error_json = ?, updated_at = ? WHERE parse_job_id = ? AND user_id = ?',
@@ -498,22 +600,31 @@ export class Repository {
     requestId: string,
     eventType: string,
   ): void {
-    this.db
-      .prepare(
-        'UPDATE verified_actions SET payload_json = ?, result_stage = ?, verification_status = ?, task_status = ?, updated_at = ? WHERE action_id = ? AND user_id = ?',
-      )
-      .run(
-        json(action),
-        action.result_stage,
-        action.verification_status,
-        action.task_status,
-        now(),
-        action.action_id,
-        userId,
-      );
-    this.recordAudit(requestId, userId, eventType, 'action', action.action_id, {
-      result_stage: action.result_stage,
-    });
+    const updatedAt = now();
+    this.db.exec('BEGIN');
+    try {
+      this.db
+        .prepare(
+          'UPDATE verified_actions SET payload_json = ?, result_stage = ?, verification_status = ?, task_status = ?, updated_at = ? WHERE action_id = ? AND user_id = ?',
+        )
+        .run(
+          json(action),
+          action.result_stage,
+          action.verification_status,
+          action.task_status,
+          updatedAt,
+          action.action_id,
+          userId,
+        );
+      insertActionChanges(this.db, action);
+      this.recordAudit(requestId, userId, eventType, 'action', action.action_id, {
+        result_stage: action.result_stage,
+      });
+      this.db.exec('COMMIT');
+    } catch (error) {
+      this.db.exec('ROLLBACK');
+      throw error;
+    }
   }
 
   createTask(userId: string, actionId: string, title: string | undefined, requestId: string): Task {

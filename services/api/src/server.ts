@@ -10,6 +10,7 @@ import {
   type UserProfile,
   type VerifiedActionObject,
 } from '@campus-action-os/protocol';
+import { normalizeDocument } from '../../ai-parser/src/document-normalizer.js';
 import { Repository, RepositoryError } from './repository.js';
 
 const port = Number(process.env.API_PORT ?? 3000);
@@ -132,13 +133,14 @@ async function parseDocument(
   requestId: string,
   parserBaseUrl: string,
 ): Promise<void> {
-  if (document.content_type !== 'text/plain') {
+  const normalized = normalizeDocument(document);
+  if (!normalized.ok) {
     repository.failParseJob(
       userId,
       parseJobId,
       {
-        code: 'UNSUPPORTED_CONTENT_TYPE',
-        message: 'Only text/plain is enabled by the rule parser',
+        code: normalized.code,
+        message: normalized.message,
       },
       requestId,
     );
@@ -159,8 +161,8 @@ async function parseDocument(
     document: {
       document_id: document.document_id,
       content_type: 'text/plain',
-      text: document.text,
-      content_sha256: document.content_sha256,
+      text: normalized.text,
+      content_sha256: normalized.content_sha256,
       language: 'zh-CN',
       timezone: 'Asia/Shanghai',
     },
@@ -346,8 +348,10 @@ async function handle(
     const document = repository.getDocument(userId, segments[1]);
     if (!document) throw new RepositoryError('DOCUMENT_NOT_FOUND', 404, 'Document not found');
     const job = repository.createParseJob(userId, document.document_id, requestId, key);
-    if (!job.existed)
+    if (!job.existed) {
+      repository.startParseJob(userId, job.parseJobId, requestId);
       await parseDocument(repository, userId, document, job.parseJobId, requestId, parserBaseUrl);
+    }
     send(response, 202, jobResponse(repository, userId, job.parseJobId), requestId);
     return;
   }
@@ -362,12 +366,24 @@ async function handle(
     request.method === 'POST' &&
     segments[2] === 'confirm'
   ) {
-    send(
-      response,
-      200,
-      { action: repository.confirmAction(userId, segments[1], requestId, body.confirmed === true) },
-      requestId,
-    );
+    const key = idempotencyKey(request, body);
+    const hash = requestHash(body);
+    const previous = repository.getIdempotency(userId, path, key, hash);
+    if (previous === 'conflict')
+      throw new RepositoryError(
+        'IDEMPOTENCY_CONFLICT',
+        409,
+        'Idempotency key was reused with a different request',
+      );
+    if (previous) {
+      send(response, previous.status, previous.body, requestId);
+      return;
+    }
+    const output = {
+      action: repository.confirmAction(userId, segments[1], requestId, body.confirmed === true),
+    };
+    repository.saveIdempotency(userId, path, key, hash, 200, output);
+    send(response, 200, output, requestId);
     return;
   }
   if (
@@ -376,12 +392,24 @@ async function handle(
     request.method === 'POST' &&
     segments[2] === 'reject'
   ) {
-    send(
-      response,
-      200,
-      { action: repository.rejectAction(userId, segments[1], requestId, body.rejected === true) },
-      requestId,
-    );
+    const key = idempotencyKey(request, body);
+    const hash = requestHash(body);
+    const previous = repository.getIdempotency(userId, path, key, hash);
+    if (previous === 'conflict')
+      throw new RepositoryError(
+        'IDEMPOTENCY_CONFLICT',
+        409,
+        'Idempotency key was reused with a different request',
+      );
+    if (previous) {
+      send(response, previous.status, previous.body, requestId);
+      return;
+    }
+    const output = {
+      action: repository.rejectAction(userId, segments[1], requestId, body.rejected === true),
+    };
+    repository.saveIdempotency(userId, path, key, hash, 200, output);
+    send(response, 200, output, requestId);
     return;
   }
   if (
@@ -485,25 +513,52 @@ async function handle(
     request.method === 'POST' &&
     segments[2] === 'complete'
   ) {
+    const key = idempotencyKey(request, body);
+    const hash = requestHash(body);
+    const previous = repository.getIdempotency(userId, path, key, hash);
+    if (previous === 'conflict')
+      throw new RepositoryError(
+        'IDEMPOTENCY_CONFLICT',
+        409,
+        'Idempotency key was reused with a different request',
+      );
+    if (previous) {
+      send(response, previous.status, previous.body, requestId);
+      return;
+    }
     if (body.confirmed !== true)
       throw new RepositoryError(
         'CONFIRMATION_REQUIRED',
         400,
         'Completing a task requires explicit confirmation',
       );
-    send(
-      response,
-      200,
-      { task: repository.updateTask(userId, segments[1], { status: 'completed' }, requestId) },
-      requestId,
-    );
+    const output = {
+      task: repository.updateTask(userId, segments[1], { status: 'completed' }, requestId),
+    };
+    repository.saveIdempotency(userId, path, key, hash, 200, output);
+    send(response, 200, output, requestId);
     return;
   }
 
   if (request.method === 'POST' && path === '/notices') {
+    const key = idempotencyKey(request, body);
+    const hash = requestHash(body);
+    const previous = repository.getIdempotency(userId, path, key, hash);
+    if (previous === 'conflict')
+      throw new RepositoryError(
+        'IDEMPOTENCY_CONFLICT',
+        409,
+        'Idempotency key was reused with a different request',
+      );
+    if (previous) {
+      send(response, previous.status, previous.body, requestId);
+      return;
+    }
     const title = stringField(body, 'title')!;
     const notice = repository.createNotice(userId, title, stringField(body, 'body')!, requestId);
-    send(response, 201, { notice }, requestId);
+    const output = { notice };
+    repository.saveIdempotency(userId, path, key, hash, 201, output);
+    send(response, 201, output, requestId);
     return;
   }
   if (
@@ -523,14 +578,24 @@ async function handle(
     segments[2] === 'publish' &&
     request.method === 'POST'
   ) {
-    send(
-      response,
-      200,
-      {
-        revision: repository.publishNotice(userId, segments[1], requestId, body.confirmed === true),
-      },
-      requestId,
-    );
+    const key = idempotencyKey(request, body);
+    const hash = requestHash(body);
+    const previous = repository.getIdempotency(userId, path, key, hash);
+    if (previous === 'conflict')
+      throw new RepositoryError(
+        'IDEMPOTENCY_CONFLICT',
+        409,
+        'Idempotency key was reused with a different request',
+      );
+    if (previous) {
+      send(response, previous.status, previous.body, requestId);
+      return;
+    }
+    const output = {
+      revision: repository.publishNotice(userId, segments[1], requestId, body.confirmed === true),
+    };
+    repository.saveIdempotency(userId, path, key, hash, 200, output);
+    send(response, 200, output, requestId);
     return;
   }
   if (
@@ -539,20 +604,30 @@ async function handle(
     segments[2] === 'revisions' &&
     request.method === 'POST'
   ) {
-    send(
-      response,
-      201,
-      {
-        revision: repository.createRevision(
-          userId,
-          segments[1],
-          stringField(body, 'title')!,
-          stringField(body, 'body')!,
-          requestId,
-        ),
-      },
-      requestId,
-    );
+    const key = idempotencyKey(request, body);
+    const hash = requestHash(body);
+    const previous = repository.getIdempotency(userId, path, key, hash);
+    if (previous === 'conflict')
+      throw new RepositoryError(
+        'IDEMPOTENCY_CONFLICT',
+        409,
+        'Idempotency key was reused with a different request',
+      );
+    if (previous) {
+      send(response, previous.status, previous.body, requestId);
+      return;
+    }
+    const output = {
+      revision: repository.createRevision(
+        userId,
+        segments[1],
+        stringField(body, 'title')!,
+        stringField(body, 'body')!,
+        requestId,
+      ),
+    };
+    repository.saveIdempotency(userId, path, key, hash, 201, output);
+    send(response, 201, output, requestId);
     return;
   }
   if (
@@ -576,18 +651,28 @@ async function handle(
     return;
   }
   if (request.method === 'POST' && path === '/feedback') {
-    send(
-      response,
-      201,
-      repository.addFeedback(
-        userId,
-        stringField(body, 'actionId', false),
-        stringField(body, 'kind')!,
-        stringField(body, 'message')!,
-        requestId,
-      ),
+    const key = idempotencyKey(request, body);
+    const hash = requestHash(body);
+    const previous = repository.getIdempotency(userId, path, key, hash);
+    if (previous === 'conflict')
+      throw new RepositoryError(
+        'IDEMPOTENCY_CONFLICT',
+        409,
+        'Idempotency key was reused with a different request',
+      );
+    if (previous) {
+      send(response, previous.status, previous.body, requestId);
+      return;
+    }
+    const output = repository.addFeedback(
+      userId,
+      stringField(body, 'actionId', false),
+      stringField(body, 'kind')!,
+      stringField(body, 'message')!,
       requestId,
     );
+    repository.saveIdempotency(userId, path, key, hash, 201, output);
+    send(response, 201, output, requestId);
     return;
   }
   throw new RepositoryError('NOT_FOUND', 404, 'Route not found');

@@ -1,0 +1,9 @@
+<view class="page">
+  <view class="title">任务列表</view>
+  <view class="card" wx:for="{{tasks}}" wx:key="task_id">
+    <view>{{item.title}}</view>
+    <view class="muted">{{item.status}} · {{item.due_at || '无明确截止时间'}}</view>
+  </view>
+  <view class="card" wx:if="{{!tasks.length}}">暂无任务。</view>
+  <view class="danger" wx:if="{{error}}">{{error}}</view>
+</view>

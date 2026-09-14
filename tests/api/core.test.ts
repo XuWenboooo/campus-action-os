@@ -66,6 +66,14 @@ test('API closes the document → parse job → verified action → confirmed ta
     );
     assert.equal(replay.result.status, 201);
     assert.equal(replay.parsed.document.document_id, document.parsed.document.document_id);
+    const idempotencyConflict = await call(
+      'POST',
+      '/documents',
+      { title: '不同请求', text, data_origin: 'synthetic' },
+      { 'idempotency-key': 'doc-loop-1' },
+    );
+    assert.equal(idempotencyConflict.result.status, 409);
+    assert.equal(idempotencyConflict.parsed.error.code, 'IDEMPOTENCY_CONFLICT');
 
     const documentId = document.parsed.document.document_id as string;
     const parsed = await call(
@@ -78,22 +86,64 @@ test('API closes the document → parse job → verified action → confirmed ta
     assert.equal(parsed.parsed.status, 'succeeded');
     assert.equal(parsed.parsed.result.verified_actions.length, 2);
     assert.equal(parsed.parsed.result.action_graph.edges.length, 1);
+    assert.equal(
+      (
+        repository.db
+          .prepare(
+            "SELECT count(*) AS count FROM audit_events WHERE event_type = 'parse_job.started'",
+          )
+          .get() as { count: number }
+      ).count,
+      1,
+    );
 
     const actions = await call('GET', `/documents/${documentId}/actions`);
     assert.equal(actions.result.status, 200);
     assert.equal(actions.parsed.actions.length, 2);
     const actionId = actions.parsed.actions[0].action_id as string;
-    const missingConfirmation = await call('POST', `/actions/${actionId}/confirm`, {});
+    const missingConfirmation = await call(
+      'POST',
+      `/actions/${actionId}/confirm`,
+      {},
+      {
+        'idempotency-key': 'confirm-missing-1',
+      },
+    );
     assert.equal(missingConfirmation.result.status, 400);
     assert.equal(missingConfirmation.parsed.error.code, 'CONFIRMATION_REQUIRED');
-    const confirmation = await call('POST', `/actions/${actionId}/confirm`, { confirmed: true });
+    const confirmation = await call(
+      'POST',
+      `/actions/${actionId}/confirm`,
+      { confirmed: true },
+      { 'idempotency-key': 'confirm-1' },
+    );
     assert.equal(confirmation.result.status, 200);
     assert.equal(confirmation.parsed.action.result_stage, 'user_confirmed');
+    const confirmationReplay = await call(
+      'POST',
+      `/actions/${actionId}/confirm`,
+      { confirmed: true },
+      { 'idempotency-key': 'confirm-1' },
+    );
+    assert.deepEqual(confirmationReplay.parsed, confirmation.parsed);
     const edited = await call('PATCH', `/actions/${actionId}`, { title: '用户确认后的申请任务' });
     assert.equal(edited.result.status, 200);
     assert.equal(edited.parsed.action.title, '用户确认后的申请任务');
+    assert.equal(
+      (
+        repository.db
+          .prepare('SELECT count(*) AS count FROM action_change_history WHERE action_id = ?')
+          .get(actionId) as { count: number }
+      ).count,
+      3,
+    );
     const secondActionId = actions.parsed.actions[1].action_id as string;
-    const rejection = await call('POST', `/actions/${secondActionId}/reject`, { rejected: true });
+    const rejection = await call(
+      'POST',
+      `/actions/${secondActionId}/reject`,
+      { rejected: true },
+      { 'idempotency-key': 'reject-1' },
+    );
     assert.equal(rejection.result.status, 200);
     assert.equal(rejection.parsed.action.verification_status, 'conflict');
     const rejectedTask = await call(
@@ -116,14 +166,26 @@ test('API closes the document → parse job → verified action → confirmed ta
       'POST',
       `/tasks/${task.parsed.task.task_id}/complete`,
       {},
+      { 'idempotency-key': 'complete-missing-1' },
     );
     assert.equal(missingCompleteConfirmation.result.status, 400);
     assert.equal(missingCompleteConfirmation.parsed.error.code, 'CONFIRMATION_REQUIRED');
-    const completed = await call('POST', `/tasks/${task.parsed.task.task_id}/complete`, {
-      confirmed: true,
-    });
+    const completed = await call(
+      'POST',
+      `/tasks/${task.parsed.task.task_id}/complete`,
+      { confirmed: true },
+      { 'idempotency-key': 'complete-1' },
+    );
     assert.equal(completed.result.status, 200);
     assert.equal(completed.parsed.task.status, 'completed');
+    const completedReplay = await call(
+      'POST',
+      `/tasks/${task.parsed.task.task_id}/complete`,
+      { confirmed: true },
+      { 'idempotency-key': 'complete-1' },
+    );
+    assert.equal(completedReplay.result.status, 200);
+    assert.deepEqual(completedReplay.parsed, completed.parsed);
     const actionAfterComplete = await call('GET', `/actions/${actionId}`);
     assert.equal(actionAfterComplete.parsed.action.task_status, 'completed');
     const illegal = await call('PATCH', `/tasks/${task.parsed.task.task_id}`, {
@@ -170,6 +232,82 @@ test('API persists parser outage as a failed ParseJob instead of a fake success'
   }
 });
 
+test('API persists an explicit OCR degradation for image input', async () => {
+  const repository = new Repository(':memory:');
+  const api = createApiServer({ repository, parserUrl: 'http://127.0.0.1:1' });
+  const url = await listen(api.server);
+  const headers = {
+    'content-type': 'application/json',
+    'x-dev-user-id': 'ocr-student',
+  };
+  try {
+    const documentResponse = await fetch(`${url}/documents`, {
+      method: 'POST',
+      headers: { ...headers, 'idempotency-key': 'ocr-doc-1' },
+      body: JSON.stringify({
+        title: '合成截图通知',
+        contentType: 'image/png',
+        text: 'binary-placeholder-not-used-as-ocr',
+        data_origin: 'synthetic',
+      }),
+    });
+    const documentBody = await documentResponse.json();
+    const parseResponse = await fetch(
+      `${url}/documents/${documentBody.document.document_id}/parse`,
+      {
+        method: 'POST',
+        headers: { ...headers, 'idempotency-key': 'ocr-parse-1' },
+        body: '{}',
+      },
+    );
+    const parseBody = await parseResponse.json();
+    assert.equal(parseResponse.status, 202);
+    assert.equal(parseBody.status, 'failed');
+    assert.equal(parseBody.error.code, 'OCR_NOT_CONFIGURED');
+  } finally {
+    await close(api.server);
+    repository.close();
+  }
+});
+
+test('API normalizes simple HTML before handing it to the text parser', async () => {
+  const ai = createParserServer();
+  const aiUrl = await listen(ai);
+  const repository = new Repository(':memory:');
+  const api = createApiServer({ repository, parserUrl: aiUrl });
+  const url = await listen(api.server);
+  const headers = { 'content-type': 'application/json', 'x-dev-user-id': 'html-student' };
+  try {
+    const documentResponse = await fetch(`${url}/documents`, {
+      method: 'POST',
+      headers: { ...headers, 'idempotency-key': 'html-doc-1' },
+      body: JSON.stringify({
+        title: '合成 HTML 通知',
+        contentType: 'text/html',
+        text: '<p>适用对象：本科生</p><p>1. 提交申请</p><p>截止：2099-10-03 前</p>',
+        data_origin: 'synthetic',
+      }),
+    });
+    const documentBody = await documentResponse.json();
+    const parseResponse = await fetch(
+      `${url}/documents/${documentBody.document.document_id}/parse`,
+      {
+        method: 'POST',
+        headers: { ...headers, 'idempotency-key': 'html-parse-1' },
+        body: '{}',
+      },
+    );
+    const parseBody = await parseResponse.json();
+    assert.equal(parseResponse.status, 202);
+    assert.equal(parseBody.status, 'needs_confirmation');
+    assert.equal(parseBody.result.verified_actions[0].deadline.value, '2099-10-03');
+  } finally {
+    await close(api.server);
+    await close(ai);
+    repository.close();
+  }
+});
+
 test('production mode rejects dev login', async () => {
   const repository = new Repository(':memory:');
   const api = createApiServer({ repository, environment: 'production' });
@@ -194,31 +332,53 @@ test('publisher notice endpoints retain revision history and all side effects re
   const api = createApiServer({ repository });
   const url = await listen(api.server);
   const headers = { 'content-type': 'application/json', 'x-dev-user-id': 'synthetic-publisher' };
-  const call = async (method: string, path: string, body?: unknown) => {
+  const call = async (
+    method: string,
+    path: string,
+    body?: unknown,
+    extra: Record<string, string> = {},
+  ) => {
     const result = await fetch(`${url}${path}`, {
       method,
-      headers,
+      headers: { ...headers, ...extra },
       body: body === undefined ? undefined : JSON.stringify(body),
     });
     return { result, body: result.status === 204 ? null : await result.json() };
   };
   try {
-    const created = await call('POST', '/notices', {
-      title: '合成发布通知',
-      body: '请在 2099-10-01 前完成登记',
+    const noticeInput = { title: '合成发布通知', body: '请在 2099-10-01 前完成登记' };
+    const created = await call('POST', '/notices', noticeInput, {
+      'idempotency-key': 'notice-create-1',
     });
     assert.equal(created.result.status, 201);
     const noticeId = created.body.notice.notice_id as string;
-    const noConfirmation = await call('POST', `/notices/${noticeId}/publish`, {});
+    const noConfirmation = await call(
+      'POST',
+      `/notices/${noticeId}/publish`,
+      {},
+      {
+        'idempotency-key': 'notice-publish-missing-1',
+      },
+    );
     assert.equal(noConfirmation.result.status, 400);
     assert.equal(noConfirmation.body.error.code, 'CONFIRMATION_REQUIRED');
-    const published = await call('POST', `/notices/${noticeId}/publish`, { confirmed: true });
+    const published = await call(
+      'POST',
+      `/notices/${noticeId}/publish`,
+      { confirmed: true },
+      { 'idempotency-key': 'notice-publish-1' },
+    );
     assert.equal(published.result.status, 200);
     assert.equal(published.body.revision.status, 'published');
-    const revised = await call('POST', `/notices/${noticeId}/revisions`, {
-      title: '延期后的合成通知',
-      body: '截止时间改为 2099-10-08',
-    });
+    const revised = await call(
+      'POST',
+      `/notices/${noticeId}/revisions`,
+      {
+        title: '延期后的合成通知',
+        body: '截止时间改为 2099-10-08',
+      },
+      { 'idempotency-key': 'notice-revision-1' },
+    );
     assert.equal(revised.result.status, 201);
     assert.equal(revised.body.revision.revision_number, 2);
     const read = await call('GET', `/notices/${noticeId}`);
@@ -226,10 +386,15 @@ test('publisher notice endpoints retain revision history and all side effects re
     const preview = await call('GET', `/notices/${noticeId}/preview`);
     assert.equal(preview.result.status, 200);
     assert.equal(preview.body.revision.revision_id, revised.body.revision.revision_id);
-    const feedback = await call('POST', '/feedback', {
-      kind: 'notice_review',
-      message: 'synthetic feedback',
-    });
+    const feedback = await call(
+      'POST',
+      '/feedback',
+      {
+        kind: 'notice_review',
+        message: 'synthetic feedback',
+      },
+      { 'idempotency-key': 'feedback-1' },
+    );
     assert.equal(feedback.result.status, 201);
   } finally {
     await close(api.server);

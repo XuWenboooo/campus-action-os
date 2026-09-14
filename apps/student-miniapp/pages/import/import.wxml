@@ -1,0 +1,7 @@
+<view class="page">
+  <view class="title">导入文字通知</view>
+  <view class="muted">当前宿主只提交文本给 API；图片/PDF 需等待已配置 OCR，不能伪装成文本解析。</view>
+  <textarea value="{{text}}" placeholder="粘贴校园通知原文" maxlength="100000" bindinput="onInput" />
+  <button class="button" loading="{{loading}}" disabled="{{loading}}" bindtap="submit">开始解析</button>
+  <view class="danger" wx:if="{{error}}">{{error}}</view>
+</view>

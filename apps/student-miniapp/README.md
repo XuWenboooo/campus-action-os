@@ -1,5 +1,7 @@
 # Student mini-program boundary
 
-微信小程序宿主目录。页面、AppSecret 和模型密钥尚未接入；客户端只允许调用 API 服务。
+微信小程序宿主目录。这里提供本地开发用的原生最小页面和 API client；页面、AppSecret 和模型密钥尚未接入，客户端只允许调用 API 服务。
+
+导入项目后请把 `app.js` 中的 `apiBaseUrl` 指向开发机可访问地址。微信开发者工具运行、设备兼容性、网络配置和页面交互仍必须按 `docs/manual-wechat-verification.md` 人工验证，当前状态是 `MANUAL_VERIFICATION_REQUIRED`。
 
 `src/protocol.ts` 是客户端与共享协议包的唯一边界；它不在小程序包内保存模型服务密钥。

@@ -1,0 +1,13 @@
+<view class="page">
+  <view class="title">今天要做</view>
+  <view class="muted">只展示已经落库的任务；创建任务前必须经过用户确认。</view>
+  <button class="button" bindtap="openImport">导入校园通知</button>
+  <view class="card" wx:for="{{tasks}}" wx:key="task_id">
+    <view>{{item.title}}</view>
+    <view class="muted">状态：{{item.status}}　截止：{{item.due_at || '未知'}}</view>
+  </view>
+  <view class="card" wx:if="{{!tasks.length}}">还没有任务，可以先导入一条通知。</view>
+  <button class="button secondary" bindtap="openProfile">用户画像</button>
+  <button class="button secondary" bindtap="openSettings">设置与隐私</button>
+  <view class="danger" wx:if="{{error}}">{{error}}</view>
+</view>

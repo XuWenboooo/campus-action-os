@@ -1,0 +1,4 @@
+{
+  "desc": "Campus Action OS local development sitemap",
+  "rules": [{ "action": "allow", "page": "*" }]
+}

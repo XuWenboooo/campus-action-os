@@ -1,0 +1,22 @@
+<view class="page">
+  <view class="title">解析结果</view>
+  <view class="card" wx:if="{{job}}">
+    <view>任务状态：{{job.status}}</view>
+    <view class="muted">ParseJob：{{job.parse_job_id}}</view>
+    <view class="danger" wx:if="{{job.error}}">{{job.error.code}}：{{job.error.message}}</view>
+  </view>
+  <view class="card" wx:if="{{assessment}}">
+    <view>与你是否相关：{{assessment.user_relevance}}</view>
+    <view class="muted">{{assessment.relevance_reason}}</view>
+  </view>
+  <view class="card" wx:for="{{actions}}" wx:key="action_id">
+    <view>{{item.title}}</view>
+    <view>截止：{{item.deadline.value || '未知，需确认'}}</view>
+    <view>核验状态：{{item.verification_status}}</view>
+    <view wx:for="{{item.evidence}}" wx:key="evidence_id" class="muted">证据：{{item.source_text}}</view>
+    <button class="button" bindtap="confirm" data-id="{{item.action_id}}">确认并创建任务</button>
+    <button class="button secondary" bindtap="reject" data-id="{{item.action_id}}">拒绝此行动</button>
+  </view>
+  <view class="card" wx:if="{{!actions.length && !job.error}}">正在等待解析结果……</view>
+  <view class="danger" wx:if="{{error}}">{{error}}</view>
+</view>

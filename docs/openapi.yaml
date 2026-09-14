@@ -103,7 +103,9 @@ paths:
   /actions/{actionId}/confirm:
     post:
       security: [{ devUser: [] }]
-      parameters: [{ $ref: '#/components/parameters/ActionId' }]
+      parameters:
+        - { $ref: '#/components/parameters/ActionId' }
+        - { $ref: '#/components/parameters/IdempotencyKey' }
       requestBody: { $ref: '#/components/requestBodies/Confirmation' }
       responses:
         {
@@ -113,7 +115,9 @@ paths:
   /actions/{actionId}/reject:
     post:
       security: [{ devUser: [] }]
-      parameters: [{ $ref: '#/components/parameters/ActionId' }]
+      parameters:
+        - { $ref: '#/components/parameters/ActionId' }
+        - { $ref: '#/components/parameters/IdempotencyKey' }
       requestBody: { $ref: '#/components/requestBodies/Rejection' }
       responses: { '200': { description: Rejected action } }
   /actions/{actionId}:
@@ -162,12 +166,15 @@ paths:
   /tasks/{taskId}/complete:
     post:
       security: [{ devUser: [] }]
-      parameters: [{ $ref: '#/components/parameters/TaskId' }]
+      parameters:
+        - { $ref: '#/components/parameters/TaskId' }
+        - { $ref: '#/components/parameters/IdempotencyKey' }
       requestBody: { $ref: '#/components/requestBodies/Confirmation' }
       responses: { '200': { description: Completed task } }
   /notices:
     post:
       security: [{ devUser: [] }]
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
       requestBody: { $ref: '#/components/requestBodies/NoticeInput' }
       responses: { '201': { description: Draft notice } }
   /notices/{noticeId}:
@@ -178,13 +185,17 @@ paths:
   /notices/{noticeId}/publish:
     post:
       security: [{ devUser: [] }]
-      parameters: [{ $ref: '#/components/parameters/NoticeId' }]
+      parameters:
+        - { $ref: '#/components/parameters/NoticeId' }
+        - { $ref: '#/components/parameters/IdempotencyKey' }
       requestBody: { $ref: '#/components/requestBodies/Confirmation' }
       responses: { '200': { description: Published revision } }
   /notices/{noticeId}/revisions:
     post:
       security: [{ devUser: [] }]
-      parameters: [{ $ref: '#/components/parameters/NoticeId' }]
+      parameters:
+        - { $ref: '#/components/parameters/NoticeId' }
+        - { $ref: '#/components/parameters/IdempotencyKey' }
       requestBody: { $ref: '#/components/requestBodies/NoticeInput' }
       responses: { '201': { description: New draft revision } }
   /notices/{noticeId}/preview:
@@ -195,6 +206,7 @@ paths:
   /feedback:
     post:
       security: [{ devUser: [] }]
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
       requestBody:
         required: true
         content:

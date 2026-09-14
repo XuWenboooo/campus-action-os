@@ -29,7 +29,11 @@
     "benchmark_status": "development_only",
     "category": "scholarship",
     "text": "适用对象：困难生\n1. 提交申请\n材料：申请表、证明材料\n截止：2099-09-04 18:00 前",
-    "expected": { "relevance": "relevant", "deadline": "explicit" }
+    "expected": {
+      "relevance": "relevant",
+      "deadline": "explicit",
+      "materials": ["申请表", "证明材料"]
+    }
   },
   {
     "fixture_id": "SYN-005",
@@ -93,7 +97,11 @@
     "benchmark_status": "development_only",
     "category": "student-affairs",
     "text": "适用对象：大一学生\n1. 参加培训\n材料：学生证\n地点：B楼201",
-    "expected": { "relevance": "relevant", "deadline": "unknown" }
+    "expected": {
+      "relevance": "relevant",
+      "deadline": "unknown",
+      "materials": ["学生证"]
+    }
   },
   {
     "fixture_id": "SYN-013",

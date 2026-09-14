@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://campus-action-os.example/schemas/interfaces/v1/user-data-export.schema.json",
+  "title": "Campus Action OS User Data Export v1",
+  "type": "object",
+  "required": ["schema_version", "user_id", "exported_at", "profile", "documents", "document_files", "parse_jobs", "actions", "tasks"],
+  "properties": {
+    "schema_version": { "const": "user-data-export/v1" },
+    "user_id": { "type": "string", "minLength": 1 },
+    "exported_at": { "type": "string", "format": "date-time" },
+    "profile": { "$ref": "https://campus-action-os.example/schemas/interfaces/v1/user-profile.schema.json" },
+    "documents": {
+      "type": "array",
+      "items": { "$ref": "https://campus-action-os.example/schemas/interfaces/v1/document.schema.json" }
+    },
+    "document_files": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/documentFile" }
+    },
+    "parse_jobs": {
+      "type": "array",
+      "items": { "$ref": "https://campus-action-os.example/schemas/interfaces/v1/parse-job.schema.json" }
+    },
+    "actions": {
+      "type": "array",
+      "items": { "$ref": "https://campus-action-os.example/schemas/v1/verified-action-object.schema.json" }
+    },
+    "tasks": {
+      "type": "array",
+      "items": { "$ref": "https://campus-action-os.example/schemas/interfaces/v1/task.schema.json" }
+    }
+  },
+  "unevaluatedProperties": false,
+  "$defs": {
+    "documentFile": {
+      "type": "object",
+      "required": ["document_id", "content_type", "byte_length", "content_sha256", "created_at", "content_base64"],
+      "properties": {
+        "document_id": { "type": "string", "minLength": 1 },
+        "content_type": { "enum": ["image/png", "application/pdf"] },
+        "byte_length": { "type": "integer", "minimum": 1, "maximum": 800000 },
+        "content_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "created_at": { "type": "string", "format": "date-time" },
+        "content_base64": { "type": "string", "minLength": 4 }
+      },
+      "unevaluatedProperties": false
+    }
+  }
+}

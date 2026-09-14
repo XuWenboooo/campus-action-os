@@ -43,5 +43,6 @@
 - 补齐学生端任务可达性：首页增加任务中心入口，任务页提供二次确认后的完成操作；解析成功但无行动时展示完成态，不再误显示为持续等待。
 - 修正 Windows 启动配置：`start-dev.ps1` 与 `verify-start.ps1` 现在显式绑定 `AI_SERVICE_URL`；启动验证从仅检查健康端点升级为实际执行一次合成 API→AI 解析，并确认监听端口清理。
 - 收紧媒体入口：`/documents` 不再接受没有源字节的图片/PDF 声明，二进制必须经 `/documents/upload`，并新增错误路径回归测试。
+- 增加 `user-data-export/v1` 公共 Schema 和只读 `GET /users/me/export`：导出当前用户画像、原文、完整性校验后的媒体 Base64、ParseJob、Action 与 Task；API、Repository、OpenAPI 和小程序隐私设置均已接入并测试。
 
 仍为 `NOT_READY`：真实 OCR/provider、正式 800 条冻结评测、微信开发者工具人工验证、真实认证/提醒和生产部署均缺失；本地测试不能替代这些证据。

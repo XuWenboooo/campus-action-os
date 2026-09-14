@@ -341,6 +341,11 @@ test('file-backed Repository survives close and reopen', () => {
     assert.ok(mediaFile);
     assert.equal(mediaFile?.byte_length, 5);
     assert.deepEqual(first.getDocumentContent('persistent-user', mediaDocument.document_id), raw);
+    const exported = first.exportUserData('persistent-user');
+    assert.equal(exported.schema_version, 'user-data-export/v1');
+    assert.equal(exported.documents.length, 2);
+    assert.equal(exported.document_files.length, 1);
+    assert.equal(exported.document_files[0]?.content_base64, Buffer.from(raw).toString('base64'));
     first.db
       .prepare('UPDATE document_files SET content_sha256 = ? WHERE document_id = ?')
       .run('0'.repeat(64), mediaDocument.document_id);

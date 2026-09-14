@@ -15,6 +15,7 @@ for (const section of ['parameters', 'requestBodies', 'responses']) {
 }
 for (const route of [
   '/v1/capabilities:',
+  '/users/me/export:',
   '/documents/{documentId}/parse:',
   '/tasks/{taskId}/notices:',
   '/tasks/{taskId}/notice-sync:',

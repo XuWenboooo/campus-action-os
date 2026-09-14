@@ -8,6 +8,7 @@ import {
   validateParseJob,
   validateTask,
   validateTextParseResponse,
+  validateUserDataExport,
   validateUserProfile,
   validateVerifiedActionObject,
   type ApiError,
@@ -18,6 +19,7 @@ import {
   type Task,
   type TextParseResponse,
   type UserProfile,
+  type UserDataExport,
   type VerifiedActionObject,
 } from '@campus-action-os/protocol';
 
@@ -384,6 +386,67 @@ export class Repository {
     const valid = validateUserProfile(profile);
     if (!valid.ok)
       throw new RepositoryError('DATA_CORRUPTION', 500, 'Stored profile failed schema validation');
+    return valid.value;
+  }
+
+  exportUserData(userId: string): UserDataExport {
+    const documents = (
+      this.db
+        .prepare(
+          'SELECT * FROM documents WHERE owner_user_id = ? AND deleted_at IS NULL ORDER BY created_at',
+        )
+        .all(userId) as Row[]
+    ).map(documentFromRow);
+    const documentFiles = documents.flatMap((document) => {
+      const file = this.getDocumentFile(userId, document.document_id);
+      if (!file) return [];
+      const content = this.getDocumentContent(userId, document.document_id);
+      if (!content)
+        throw new RepositoryError(
+          'DATA_CORRUPTION',
+          500,
+          'Stored document file disappeared during export',
+        );
+      return [{ ...file, content_base64: Buffer.from(content).toString('base64') }];
+    });
+    const parseJobs = (
+      this.db
+        .prepare('SELECT parse_job_id FROM parse_jobs WHERE user_id = ? ORDER BY created_at')
+        .all(userId) as Row[]
+    ).map((row) => {
+      const job = this.getParseJob(userId, text(row.parse_job_id));
+      if (!job)
+        throw new RepositoryError('DATA_CORRUPTION', 500, 'Parse job disappeared during export');
+      return job;
+    });
+    const actions = (
+      this.db
+        .prepare('SELECT payload_json FROM verified_actions WHERE user_id = ? ORDER BY created_at')
+        .all(userId) as Row[]
+    ).map(actionFromRow);
+    const tasks = (
+      this.db
+        .prepare('SELECT * FROM tasks WHERE user_id = ? ORDER BY created_at')
+        .all(userId) as Row[]
+    ).map(taskFromRow);
+    const exported: UserDataExport = {
+      schema_version: 'user-data-export/v1',
+      user_id: userId,
+      exported_at: now(),
+      profile: this.getProfile(userId),
+      documents,
+      document_files: documentFiles,
+      parse_jobs: parseJobs,
+      actions,
+      tasks,
+    };
+    const valid = validateUserDataExport(exported);
+    if (!valid.ok)
+      throw new RepositoryError(
+        'DATA_CORRUPTION',
+        500,
+        valid.errors[0]?.message ?? 'Generated user data export failed schema validation',
+      );
     return valid.value;
   }
 

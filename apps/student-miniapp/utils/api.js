@@ -132,6 +132,9 @@ module.exports = {
   getProfile() {
     return request('/users/me');
   },
+  exportUserData() {
+    return request('/users/me/export');
+  },
   updateProfile(data) {
     return request('/users/me/profile', {
       method: 'PATCH',

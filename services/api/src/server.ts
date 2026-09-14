@@ -398,6 +398,10 @@ async function handle(
     send(response, 200, { user_id: userId, profile: repository.getProfile(userId) }, requestId);
     return;
   }
+  if (request.method === 'GET' && path === '/users/me/export') {
+    send(response, 200, repository.exportUserData(userId), requestId);
+    return;
+  }
   if (request.method === 'PATCH' && path === '/users/me/profile') {
     assertAllowedFields(body, [
       'education_level',

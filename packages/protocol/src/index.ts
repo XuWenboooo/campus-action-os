@@ -267,6 +267,27 @@ export type Task = {
   completed_at: string | null;
 };
 
+export type UserDataExportFile = {
+  document_id: string;
+  content_type: 'image/png' | 'application/pdf';
+  byte_length: number;
+  content_sha256: string;
+  created_at: string;
+  content_base64: string;
+};
+
+export type UserDataExport = {
+  schema_version: 'user-data-export/v1';
+  user_id: string;
+  exported_at: string;
+  profile: PublicUserProfile;
+  documents: Document[];
+  document_files: UserDataExportFile[];
+  parse_jobs: ParseJob[];
+  actions: VerifiedActionObject[];
+  tasks: Task[];
+};
+
 export type NoticeRevisionStatus = 'draft' | 'published' | 'postponed' | 'revoked';
 export type NotificationRevision = {
   schema_version: 'notification-revision/v1';
@@ -365,7 +386,8 @@ export type ProtocolSchemaName =
   | 'parse-job'
   | 'task'
   | 'notification-revision'
-  | 'error';
+  | 'error'
+  | 'user-data-export';
 export type ValidationError = {
   path: string;
   keyword: string;
@@ -386,6 +408,7 @@ const schemaFiles: Record<ProtocolSchemaName, string> = {
   task: 'schemas/interfaces/v1/task.schema.json',
   'notification-revision': 'schemas/interfaces/v1/notification-revision.schema.json',
   error: 'schemas/interfaces/v1/error.schema.json',
+  'user-data-export': 'schemas/interfaces/v1/user-data-export.schema.json',
 };
 const sourceRoot = resolve(fileURLToPath(new URL('.', import.meta.url)), '../../..');
 
@@ -422,6 +445,20 @@ function makeValidator(name: ProtocolSchemaName, rootDir: string): ValidateFunct
     ajv.addSchema(loadSchema('action-graph', rootDir));
     ajv.addSchema(loadSchema('document-assessment', rootDir));
     ajv.addSchema(loadSchema('error', rootDir));
+  }
+  if (name === 'user-data-export') {
+    for (const schemaName of [
+      'user-profile',
+      'document',
+      'parse-job',
+      'verified-action-object',
+      'action-graph',
+      'document-assessment',
+      'text-parse-response',
+      'error',
+      'task',
+    ] as const)
+      ajv.addSchema(loadSchema(schemaName, rootDir));
   }
   return ajv.compile(loadSchema(name, rootDir));
 }
@@ -1066,6 +1103,13 @@ export function validateNotificationRevision(
 
 export function validateError(value: unknown, rootDir = sourceRoot): ValidationResult<ApiError> {
   return validate<ApiError>('error', value, rootDir);
+}
+
+export function validateUserDataExport(
+  value: unknown,
+  rootDir = sourceRoot,
+): ValidationResult<UserDataExport> {
+  return validate<UserDataExport>('user-data-export', value, rootDir);
 }
 
 export function isRetryableParseError(code: ParseErrorCode): boolean {

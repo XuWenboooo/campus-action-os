@@ -9,4 +9,10 @@
     <view class="danger">MANUAL_VERIFICATION_REQUIRED</view>
     <view class="muted">请按 docs/manual-wechat-verification.md 在微信开发者工具中逐项验证。</view>
   </view>
+  <view class="card">
+    <view>个人数据</view>
+    <view class="muted">导出当前账号的画像、原文、解析结果、行动和任务；数据只从本地 API 返回。</view>
+    <button class="button" loading="{{exporting}}" disabled="{{exporting}}" bindtap="exportData">确认并导出 JSON</button>
+  </view>
+  <view class="danger" wx:if="{{error}}">{{error}}</view>
 </view>

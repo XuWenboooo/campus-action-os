@@ -301,6 +301,37 @@ test('API closes the document → parse job → verified action → confirmed ta
     const task = await call('POST', '/tasks', { actionId }, { 'idempotency-key': 'task-loop-1' });
     assert.equal(task.result.status, 201);
     assert.equal(task.parsed.task.status, 'pending');
+    const exported = await call('GET', '/users/me/export');
+    assert.equal(exported.result.status, 200);
+    assert.equal(exported.parsed.schema_version, 'user-data-export/v1');
+    assert.equal(exported.parsed.user_id, 'synthetic-student');
+    assert.ok(
+      exported.parsed.documents.some(
+        (item: { document_id: string }) => item.document_id === documentId,
+      ),
+    );
+    assert.ok(
+      exported.parsed.parse_jobs.some(
+        (item: { document_id: string }) => item.document_id === documentId,
+      ),
+    );
+    assert.ok(
+      exported.parsed.actions.some((item: { action_id: string }) => item.action_id === actionId),
+    );
+    assert.ok(
+      exported.parsed.tasks.some((item: { action_id: string }) => item.action_id === actionId),
+    );
+    const otherUserExport = await call('GET', '/users/me/export', undefined, {
+      'x-dev-user-id': 'other-synthetic-student',
+      'x-request-id': 'other-export-request',
+    });
+    assert.equal(otherUserExport.result.status, 200);
+    assert.equal(otherUserExport.parsed.user_id, 'other-synthetic-student');
+    assert.deepEqual(otherUserExport.parsed.documents, []);
+    assert.deepEqual(otherUserExport.parsed.parse_jobs, []);
+    assert.deepEqual(otherUserExport.parsed.actions, []);
+    assert.deepEqual(otherUserExport.parsed.tasks, []);
+    assert.equal(otherUserExport.result.headers.get('x-request-id'), 'other-export-request');
     const duplicateTask = await call(
       'POST',
       '/tasks',

@@ -8,7 +8,7 @@
 
 ## 当前阶段
 
-可运行底座检查点：已提供冻结 v1 公共 Schema/运行时校验、Node 26 SQLite 迁移与 Repository、受限图片/PDF 二进制上传持久化、角色闸门、规则解析 HTTP 服务、Document → ParseJob → VerifiedActionObject → 用户确认 → Task 闭环、解析失败后的用户确认人工建任务回退、统一错误/幂等/requestId、强化 Error Shield 和 30 条合成评测。真实 OCR/provider、微信人工验证、正式 800 条评测和生产能力仍未实现。
+可运行底座检查点：已提供冻结 v1 公共 Schema/运行时校验、`user-data-export/v1` 隐私导出、Node 26 SQLite 迁移与 Repository、受限图片/PDF 二进制上传持久化、角色闸门、规则解析 HTTP 服务、Document → ParseJob → VerifiedActionObject → 用户确认 → Task 闭环、解析失败后的用户确认人工建任务回退、统一错误/幂等/requestId、强化 Error Shield 和 30 条合成评测。真实 OCR/provider、微信人工验证、正式 800 条评测和生产能力仍未实现。
 
 ## 目录
 
@@ -49,7 +49,7 @@ Windows PowerShell 可运行 `powershell -ExecutionPolicy Bypass -File scripts/v
 
 ## 测试层次
 
-单元测试验证纯函数；契约测试验证 `schemas/v1`、共享协议和 API 错误格式；集成测试验证三份 JSON Schema 与开发样例；端到端测试覆盖用户确认链路；现场演示压力测试只使用脱敏演示数据，不能替代生产容量测试。`npm run benchmark:audit` 只审计开发样例，不代表 800 条正式数据或冻结测试集已就绪。
+单元测试验证纯函数；契约测试验证 `schemas/v1`、共享协议和 API 错误格式；集成测试验证产品/Benchmark JSON Schema 与开发样例；端到端测试覆盖用户确认链路和当前用户数据导出；现场演示压力测试只使用脱敏演示数据，不能替代生产容量测试。`npm run benchmark:audit` 只审计开发样例，不代表 800 条正式数据或冻结测试集已就绪。
 
 ## 分支和提交
 

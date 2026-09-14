@@ -228,6 +228,16 @@ paths:
       security: [{ devUser: [] }]
       responses:
         '200': { description: Current user and profile }
+  /users/me/export:
+    get:
+      description: Export the current user's locally persisted profile and action data.
+      security: [{ devUser: [] }]
+      responses:
+        '200':
+          description: User data export
+          content:
+            application/json:
+              schema: { $ref: ../schemas/interfaces/v1/user-data-export.schema.json }
   /users/me/profile:
     patch:
       security: [{ devUser: [] }]

@@ -8,6 +8,7 @@ import {
   validateNotificationRevision,
   validateParseJob,
   validateTask,
+  validateUserDataExport,
   validateUserProfile,
 } from '@campus-action-os/protocol';
 
@@ -19,6 +20,7 @@ test('public domain schemas are loadable and reject unknown fields', () => {
     'task',
     'notification-revision',
     'error',
+    'user-data-export',
   ] as const) {
     const schema = loadSchema(name) as { $schema?: string; unevaluatedProperties?: boolean };
     assert.equal(schema.$schema, 'https://json-schema.org/draft/2020-12/schema');
@@ -215,4 +217,21 @@ test('public domain schemas are loadable and reject unknown fields', () => {
     }).ok,
     false,
   );
+  const exportValue = {
+    schema_version: 'user-data-export/v1',
+    user_id: 'user-1',
+    exported_at: timestamp,
+    profile: {
+      schema_version: 'user-profile/v1',
+      profile_id: 'user-1',
+      updated_at: timestamp,
+    },
+    documents: [],
+    document_files: [],
+    parse_jobs: [],
+    actions: [],
+    tasks: [],
+  };
+  assert.equal(validateUserDataExport(exportValue).ok, true);
+  assert.equal(validateUserDataExport({ ...exportValue, unexpected: true }).ok, false);
 });

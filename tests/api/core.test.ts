@@ -223,6 +223,16 @@ test('API closes the document → parse job → verified action → confirmed ta
     const task = await call('POST', '/tasks', { actionId }, { 'idempotency-key': 'task-loop-1' });
     assert.equal(task.result.status, 201);
     assert.equal(task.parsed.task.status, 'pending');
+    const actionEditedAfterTask = await call(
+      'PATCH',
+      `/actions/${actionId}`,
+      { title: '任务标题同步后的版本' },
+      { 'idempotency-key': 'action-patch-after-task-1' },
+    );
+    assert.equal(actionEditedAfterTask.result.status, 200);
+    const syncedTask = await call('GET', `/tasks/${task.parsed.task.task_id}`);
+    assert.equal(syncedTask.result.status, 200);
+    assert.equal(syncedTask.parsed.task.title, '任务标题同步后的版本');
     const invalidTaskPatch = await call(
       'PATCH',
       `/tasks/${task.parsed.task.task_id}`,
@@ -343,6 +353,85 @@ test('API persists parser outage as a failed ParseJob instead of a fake success'
     assert.equal(parseBody.error.code, 'PARSER_NOT_CONFIGURED');
   } finally {
     await close(api.server);
+    repository.close();
+  }
+});
+
+test('API cancels an active task when its linked action is rejected', async () => {
+  const ai = createParserServer();
+  const aiUrl = await listen(ai);
+  const repository = new Repository(':memory:');
+  const api = createApiServer({ repository, parserUrl: aiUrl });
+  const url = await listen(api.server);
+  const headers = { 'content-type': 'application/json', 'x-dev-user-id': 'reject-linked-student' };
+  const call = async (
+    method: string,
+    path: string,
+    body?: unknown,
+    extra: Record<string, string> = {},
+  ) => {
+    const result = await fetch(`${url}${path}`, {
+      method,
+      headers: { ...headers, ...extra },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+    return { result, body: result.status === 204 ? null : await result.json() };
+  };
+  try {
+    const document = await call(
+      'POST',
+      '/documents',
+      {
+        title: '关联拒绝合成通知',
+        text: '适用对象：本科生\n1. 完成登记\n截止：2099-10-04 前',
+        data_origin: 'synthetic',
+      },
+      { 'idempotency-key': 'reject-linked-document-1' },
+    );
+    const parsed = await call(
+      'POST',
+      `/documents/${document.body.document.document_id}/parse`,
+      {},
+      { 'idempotency-key': 'reject-linked-parse-1' },
+    );
+    const actionId = parsed.body.result.verified_actions[0].action_id as string;
+    await call(
+      'POST',
+      `/actions/${actionId}/confirm`,
+      { confirmed: true },
+      { 'idempotency-key': 'reject-linked-confirm-1' },
+    );
+    const task = await call(
+      'POST',
+      '/tasks',
+      { actionId },
+      { 'idempotency-key': 'reject-linked-task-1' },
+    );
+    const rejected = await call(
+      'POST',
+      `/actions/${actionId}/reject`,
+      { rejected: true },
+      { 'idempotency-key': 'reject-linked-action-1' },
+    );
+    assert.equal(rejected.result.status, 200);
+    assert.equal(rejected.body.action.verification_status, 'conflict');
+    assert.equal(rejected.body.action.task_status, 'cancelled');
+    const cancelled = await call('GET', `/tasks/${task.body.task.task_id}`);
+    assert.equal(cancelled.result.status, 200);
+    assert.equal(cancelled.body.task.status, 'cancelled');
+    assert.equal(
+      (
+        repository.db
+          .prepare(
+            "SELECT count(*) AS count FROM task_events WHERE task_id = ? AND to_status = 'cancelled'",
+          )
+          .get(task.body.task.task_id) as { count: number }
+      ).count,
+      1,
+    );
+  } finally {
+    await close(api.server);
+    await close(ai);
     repository.close();
   }
 });

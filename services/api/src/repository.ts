@@ -799,6 +799,53 @@ export class Repository {
           userId,
         );
       insertActionChanges(this.db, action);
+      const activeTasks = this.db
+        .prepare(
+          "SELECT task_id, title, due_at, status FROM tasks WHERE action_id = ? AND user_id = ? AND status IN ('pending', 'in_progress')",
+        )
+        .all(action.action_id, userId) as Row[];
+      for (const taskRow of activeTasks) {
+        const taskId = text(taskRow.task_id);
+        const previousStatus = taskRow.status as Task['status'];
+        if (action.verification_status === 'conflict') {
+          this.db
+            .prepare(
+              "UPDATE tasks SET status = 'cancelled', completed_at = NULL, updated_at = ? WHERE task_id = ? AND user_id = ?",
+            )
+            .run(updatedAt, taskId, userId);
+          this.db
+            .prepare(
+              'INSERT INTO task_events (event_id, task_id, from_status, to_status, reason, request_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+            )
+            .run(
+              randomUUID(),
+              taskId,
+              previousStatus,
+              'cancelled',
+              'Task cancelled because the linked action was rejected',
+              requestId,
+              updatedAt,
+            );
+          this.recordAudit(requestId, userId, 'task.cancelled_by_action', 'task', taskId, {
+            action_id: action.action_id,
+            from_status: previousStatus,
+          });
+        } else if (
+          text(taskRow.title) !== action.title ||
+          (taskRow.due_at === null ? null : text(taskRow.due_at)) !== action.deadline.value
+        ) {
+          this.db
+            .prepare(
+              'UPDATE tasks SET title = ?, due_at = ?, updated_at = ? WHERE task_id = ? AND user_id = ?',
+            )
+            .run(action.title, action.deadline.value, updatedAt, taskId, userId);
+          this.recordAudit(requestId, userId, 'task.synced_from_action', 'task', taskId, {
+            action_id: action.action_id,
+            title: action.title,
+            due_at: action.deadline.value,
+          });
+        }
+      }
       this.recordAudit(requestId, userId, eventType, 'action', action.action_id, {
         result_stage: action.result_stage,
       });

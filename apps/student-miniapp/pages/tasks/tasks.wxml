@@ -3,6 +3,7 @@
   <view class="card" wx:for="{{tasks}}" wx:for-item="task" wx:for-index="index" wx:key="task_id">
     <view>{{task.title}}</view>
     <view class="muted">{{task.status}} · {{task.due_at || '无明确截止时间'}}</view>
+    <button wx:if="{{task.status === 'pending' || task.status === 'in_progress'}}" class="button" loading="{{loadingTaskId === task.task_id}}" disabled="{{loadingTaskId === task.task_id}}" bindtap="completeTask" data-index="{{index}}">确认完成任务</button>
     <input value="{{task.noticeIdInput}}" placeholder="已发布通知 ID（可选）" data-index="{{index}}" bindinput="onNoticeInput" />
     <button class="button secondary" bindtap="linkNotice" data-index="{{index}}">关联通知变更</button>
     <view class="notice-sync" wx:for="{{task.pendingSync}}" wx:for-item="sync" wx:key="sync_event_id">

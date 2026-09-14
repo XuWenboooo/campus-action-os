@@ -17,7 +17,8 @@
     <button class="button" bindtap="confirm" data-id="{{item.action_id}}">确认并创建任务</button>
     <button class="button secondary" bindtap="reject" data-id="{{item.action_id}}">拒绝此行动</button>
   </view>
-  <view class="card" wx:if="{{!actions.length && !job.error}}">正在等待解析结果……</view>
+  <view class="card" wx:if="{{!actions.length && !job.error && !resultReady}}">正在等待解析结果……</view>
+  <view class="card" wx:if="{{!actions.length && !job.error && resultReady}}">解析已完成，但没有发现可展示的行动。</view>
   <view class="card" wx:if="{{canManual}}">
     <view class="title">解析失败后的人工建任务</view>
     <view class="muted">没有可靠的解析结果。只有你点击确认后，才会把自定义标题和截止时间落库。</view>

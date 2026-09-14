@@ -3,6 +3,7 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import {
   createApiError,
   protocolVersion,
+  validateTextParseExchange,
   validateTextParseResponseAgainstText,
   type ApiError,
   type Document,
@@ -264,14 +265,28 @@ async function parseDocument(
     repository.failParseJob(userId, parseJobId, result.body, requestId);
     return;
   }
-  const valid = validateTextParseResponseAgainstText(result.body, normalized.text);
-  if (!valid.ok) {
+  const exchange = validateTextParseExchange(input, result.body);
+  if (!exchange.ok) {
     repository.failParseJob(
       userId,
       parseJobId,
       createApiError(
         'PARSER_RESPONSE_INVALID',
         'AI parser response failed protocol validation',
+        requestId,
+      ),
+      requestId,
+    );
+    return;
+  }
+  const valid = validateTextParseResponseAgainstText(exchange.value.response, normalized.text);
+  if (!valid.ok) {
+    repository.failParseJob(
+      userId,
+      parseJobId,
+      createApiError(
+        'PARSER_RESPONSE_INVALID',
+        'AI parser response failed evidence alignment validation',
         requestId,
       ),
       requestId,
@@ -448,6 +463,15 @@ async function handle(
     }
     const uploaded = path === '/documents/upload';
     const documentContentType = contentType(body.contentType);
+    if (
+      !uploaded &&
+      (documentContentType === 'image/png' || documentContentType === 'application/pdf')
+    )
+      throw new RepositoryError(
+        'UNSUPPORTED_CONTENT_TYPE',
+        415,
+        'image/png and application/pdf documents must use /documents/upload',
+      );
     let sourceContent: Uint8Array | undefined;
     let text: string | undefined;
     if (

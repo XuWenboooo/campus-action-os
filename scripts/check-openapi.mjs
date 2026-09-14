@@ -14,6 +14,7 @@ for (const section of ['parameters', 'requestBodies', 'responses']) {
     throw new Error(`OpenAPI components.${section} is missing`);
 }
 for (const route of [
+  '/v1/capabilities:',
   '/documents/{documentId}/parse:',
   '/tasks/{taskId}/notices:',
   '/tasks/{taskId}/notice-sync:',

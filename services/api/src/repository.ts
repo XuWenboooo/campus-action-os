@@ -772,6 +772,20 @@ export class Repository {
       );
     const action = this.getAction(userId, actionId);
     if (!action) throw new RepositoryError('ACTION_NOT_FOUND', 404, 'Action not found');
+    if (action.verification_status === 'conflict')
+      throw new RepositoryError(
+        'INVALID_STATE_TRANSITION',
+        409,
+        'A rejected action cannot be confirmed again',
+      );
+    if (action.task_status !== 'pending')
+      throw new RepositoryError(
+        'INVALID_STATE_TRANSITION',
+        409,
+        `An action with task status ${action.task_status} cannot be confirmed`,
+      );
+    if (action.result_stage === 'user_confirmed' && action.verification_status === 'passed')
+      return action;
     const changed: VerifiedActionObject = {
       ...action,
       confidence: { score: action.confidence.score, basis: 'user_confirmed' },
@@ -806,6 +820,12 @@ export class Repository {
       );
     const action = this.getAction(userId, actionId);
     if (!action) throw new RepositoryError('ACTION_NOT_FOUND', 404, 'Action not found');
+    if (action.verification_status === 'conflict' || action.task_status === 'cancelled')
+      throw new RepositoryError(
+        'INVALID_STATE_TRANSITION',
+        409,
+        'An already rejected or cancelled action cannot be rejected again',
+      );
     if (action.task_status === 'completed')
       throw new RepositoryError(
         'INVALID_STATE_TRANSITION',
@@ -968,6 +988,23 @@ export class Repository {
         'Only a confirmed and verified action can become a task',
       );
     }
+    if (action.task_status !== 'pending')
+      throw new RepositoryError(
+        'INVALID_STATE_TRANSITION',
+        409,
+        `An action with task status ${action.task_status} cannot create a task`,
+      );
+    const activeTask = this.db
+      .prepare(
+        "SELECT task_id FROM tasks WHERE user_id = ? AND action_id = ? AND status IN ('pending', 'in_progress') LIMIT 1",
+      )
+      .get(userId, actionId) as Row | undefined;
+    if (activeTask)
+      throw new RepositoryError(
+        'TASK_EXISTS',
+        409,
+        'A pending or in-progress task already exists for this action',
+      );
     const timestamp = now();
     const task: Task = {
       schema_version: 'task/v1',

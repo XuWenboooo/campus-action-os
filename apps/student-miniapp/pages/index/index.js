@@ -11,6 +11,9 @@ Page({
   openImport() {
     wx.navigateTo({ url: '/pages/import/import' });
   },
+  openTasks() {
+    wx.navigateTo({ url: '/pages/tasks/tasks' });
+  },
   openProfile() {
     wx.navigateTo({ url: '/pages/profile/profile' });
   },

@@ -190,6 +190,23 @@ paths:
     get:
       responses:
         '200': { description: Ready }
+  /v1/capabilities:
+    get:
+      description: Local capability declaration; it does not expose provider credentials.
+      responses:
+        '200':
+          description: Enabled local foundation capabilities
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [service, protocolVersion, parsing, database]
+                properties:
+                  service: { const: api }
+                  protocolVersion: { type: string }
+                  parsing: { const: rule-based }
+                  database: { const: sqlite }
+                unevaluatedProperties: false
   /auth/dev-login:
     post:
       description: Development-only login; disabled when APP_ENV=production.

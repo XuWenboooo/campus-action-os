@@ -43,6 +43,14 @@ test('API closes the document → parse job → verified action → confirmed ta
   };
 
   try {
+    const capabilities = await call('GET', '/v1/capabilities');
+    assert.equal(capabilities.result.status, 200);
+    assert.deepEqual(capabilities.parsed, {
+      service: 'api',
+      protocolVersion: '1.0.0',
+      parsing: 'rule-based',
+      database: 'sqlite',
+    });
     const profileInput = {
       education_level: '本科生',
       grade: '大三',
@@ -273,6 +281,14 @@ test('API closes the document → parse job → verified action → confirmed ta
     );
     assert.equal(rejection.result.status, 200);
     assert.equal(rejection.parsed.action.verification_status, 'conflict');
+    const confirmRejected = await call(
+      'POST',
+      `/actions/${secondActionId}/confirm`,
+      { confirmed: true },
+      { 'idempotency-key': 'confirm-rejected-1' },
+    );
+    assert.equal(confirmRejected.result.status, 409);
+    assert.equal(confirmRejected.parsed.error.code, 'INVALID_STATE_TRANSITION');
     const rejectedTask = await call(
       'POST',
       '/tasks',
@@ -285,6 +301,14 @@ test('API closes the document → parse job → verified action → confirmed ta
     const task = await call('POST', '/tasks', { actionId }, { 'idempotency-key': 'task-loop-1' });
     assert.equal(task.result.status, 201);
     assert.equal(task.parsed.task.status, 'pending');
+    const duplicateTask = await call(
+      'POST',
+      '/tasks',
+      { actionId },
+      { 'idempotency-key': 'task-loop-duplicate-1' },
+    );
+    assert.equal(duplicateTask.result.status, 409);
+    assert.equal(duplicateTask.parsed.error.code, 'TASK_EXISTS');
     const customDueAt = await call(
       'PATCH',
       `/tasks/${task.parsed.task.task_id}`,
@@ -350,6 +374,14 @@ test('API closes the document → parse job → verified action → confirmed ta
     );
     assert.equal(completed.result.status, 200);
     assert.equal(completed.parsed.task.status, 'completed');
+    const duplicateCompletedTask = await call(
+      'POST',
+      '/tasks',
+      { actionId },
+      { 'idempotency-key': 'task-loop-after-complete-1' },
+    );
+    assert.equal(duplicateCompletedTask.result.status, 409);
+    assert.equal(duplicateCompletedTask.parsed.error.code, 'INVALID_STATE_TRANSITION');
     const completedReplay = await call(
       'POST',
       `/tasks/${task.parsed.task.task_id}/complete`,
@@ -595,6 +627,63 @@ test('API rejects structurally valid parser evidence that is absent from source 
   } finally {
     await close(api.server);
     await close(tamperedParser);
+    repository.close();
+  }
+});
+
+test('API rejects a parser response whose request or document identity does not round-trip', async () => {
+  const mismatchedParser = createServer(async (request, response) => {
+    let raw = '';
+    for await (const chunk of request) raw += String(chunk);
+    const input = JSON.parse(raw) as TextParseRequest;
+    const parsed = parseText(input);
+    if ('code' in parsed) {
+      response.writeHead(400, { 'content-type': 'application/json' }).end(JSON.stringify(parsed));
+      return;
+    }
+    response.writeHead(200, { 'content-type': 'application/json' }).end(
+      JSON.stringify({
+        ...parsed,
+        request_id: `${input.request_id}-wrong`,
+        document_id: `${input.document.document_id}-wrong`,
+      }),
+    );
+  });
+  const parserUrl = await listen(mismatchedParser);
+  const repository = new Repository(':memory:');
+  const api = createApiServer({ repository, parserUrl });
+  const url = await listen(api.server);
+  const headers = { 'content-type': 'application/json', 'x-dev-user-id': 'identity-student' };
+  try {
+    const documentResponse = await fetch(`${url}/documents`, {
+      method: 'POST',
+      headers: { ...headers, 'idempotency-key': 'identity-document-1' },
+      body: JSON.stringify({
+        title: '身份回环通知',
+        text: '适用对象：本科生\n1. 提交申请\n截止：2099-10-03 前',
+        data_origin: 'synthetic',
+      }),
+    });
+    const documentBody = await documentResponse.json();
+    const parseResponse = await fetch(
+      `${url}/documents/${documentBody.document.document_id}/parse`,
+      {
+        method: 'POST',
+        headers: { ...headers, 'idempotency-key': 'identity-parse-1' },
+        body: '{}',
+      },
+    );
+    const parseBody = await parseResponse.json();
+    assert.equal(parseResponse.status, 202);
+    assert.equal(parseBody.status, 'failed');
+    assert.equal(parseBody.error.code, 'PARSER_RESPONSE_INVALID');
+    assert.equal(
+      repository.listActions('identity-student', documentBody.document.document_id).length,
+      0,
+    );
+  } finally {
+    await close(api.server);
+    await close(mismatchedParser);
     repository.close();
   }
 });
@@ -847,14 +936,29 @@ test('API persists an explicit OCR degradation for image input', async () => {
     'content-type': 'application/json',
     'x-dev-user-id': 'ocr-student',
   };
+  const png =
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
   try {
-    const documentResponse = await fetch(`${url}/documents`, {
+    const wrongRoute = await fetch(`${url}/documents`, {
+      method: 'POST',
+      headers: { ...headers, 'idempotency-key': 'ocr-doc-wrong-route-1' },
+      body: JSON.stringify({
+        title: '合成截图通知',
+        contentType: 'image/png',
+        text: 'binary-placeholder-not-used-as-ocr',
+        data_origin: 'synthetic',
+      }),
+    });
+    const wrongRouteBody = await wrongRoute.json();
+    assert.equal(wrongRoute.status, 415);
+    assert.equal(wrongRouteBody.error.code, 'UNSUPPORTED_CONTENT_TYPE');
+    const documentResponse = await fetch(`${url}/documents/upload`, {
       method: 'POST',
       headers: { ...headers, 'idempotency-key': 'ocr-doc-1' },
       body: JSON.stringify({
         title: '合成截图通知',
         contentType: 'image/png',
-        text: 'binary-placeholder-not-used-as-ocr',
+        content_base64: png,
         data_origin: 'synthetic',
       }),
     });
@@ -898,6 +1002,8 @@ test('API can route a controlled synthetic OCR result through the normal parse l
   });
   const url = await listen(api.server);
   const headers = { 'content-type': 'application/json', 'x-dev-user-id': 'ocr-test-student' };
+  const png =
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
   try {
     const profile = await fetch(`${url}/users/me/profile`, {
       method: 'PATCH',
@@ -905,13 +1011,13 @@ test('API can route a controlled synthetic OCR result through the normal parse l
       body: JSON.stringify({ education_level: '本科生' }),
     });
     assert.equal(profile.status, 200);
-    const documentResponse = await fetch(`${url}/documents`, {
+    const documentResponse = await fetch(`${url}/documents/upload`, {
       method: 'POST',
       headers: { ...headers, 'idempotency-key': 'ocr-success-doc-1' },
       body: JSON.stringify({
         title: '合成 OCR 通知',
         contentType: 'image/png',
-        text: 'binary-placeholder-not-used-as-ocr',
+        content_base64: png,
         data_origin: 'synthetic',
       }),
     });

@@ -8,6 +8,7 @@ $projectRoot = Split-Path -Parent $PSScriptRoot
 $npmCommand = (Get-Command npm.cmd -ErrorAction Stop).Source
 $env:API_PORT = $ApiPort
 $env:AI_PORT = $AiPort
+$env:AI_SERVICE_URL = "http://127.0.0.1:$AiPort"
 
 & $npmCommand run db:migrate
 $ai = Start-Process -FilePath $npmCommand -ArgumentList 'run', 'dev:ai' -WorkingDirectory $projectRoot -PassThru -WindowStyle Hidden

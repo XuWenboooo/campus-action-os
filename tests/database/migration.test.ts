@@ -54,7 +54,17 @@ test('SQLite migration is repeatable, foreign keys are enabled, and all core tab
         version: number;
       }>
     ).map((row) => row.version),
-    [1, 2, 3, 4, 5, 6],
+    [1, 2, 3, 4, 5, 6, 7],
+  );
+  assert.deepEqual(
+    (
+      db
+        .prepare(
+          "SELECT name FROM sqlite_master WHERE type = 'index' AND name = 'idx_tasks_one_active_per_action'",
+        )
+        .all() as Array<{ name: string }>
+    ).map((row) => row.name),
+    ['idx_tasks_one_active_per_action'],
   );
   db.exec(
     "INSERT INTO users (user_id, open_id, created_at) VALUES ('history-user', 'history-open', '2099-01-01T00:00:00Z')",
@@ -64,6 +74,14 @@ test('SQLite migration is repeatable, foreign keys are enabled, and all core tab
   );
   db.exec(
     "INSERT INTO verified_actions (action_id, document_id, user_id, payload_json, result_stage, verification_status, task_status, created_at, updated_at) VALUES ('history-action', 'history-document', 'history-user', '{}', 'rule_reviewed', 'user_confirmation_required', 'pending', '2099-01-01T00:00:00Z', '2099-01-01T00:00:00Z')",
+  );
+  db.exec(
+    "INSERT INTO tasks (task_id, user_id, action_id, document_id, title, status, due_at, completed_at, created_at, updated_at) VALUES ('history-task-1', 'history-user', 'history-action', 'history-document', 'task', 'pending', NULL, NULL, '2099-01-01T00:00:00Z', '2099-01-01T00:00:00Z')",
+  );
+  assert.throws(() =>
+    db.exec(
+      "INSERT INTO tasks (task_id, user_id, action_id, document_id, title, status, due_at, completed_at, created_at, updated_at) VALUES ('history-task-2', 'history-user', 'history-action', 'history-document', 'duplicate', 'in_progress', NULL, NULL, '2099-01-01T00:00:00Z', '2099-01-01T00:00:00Z')",
+    ),
   );
   db.exec(
     "INSERT INTO action_change_history (change_id, action_id, occurred_at, actor, change_type, reason) VALUES ('history-change', 'history-action', '2099-01-01T00:00:00Z', 'system', 'created', 'test')",

@@ -39,7 +39,7 @@ npm run dev:mock
 npm run dev:api
 ```
 
-Windows PowerShell 可运行 `powershell -ExecutionPolicy Bypass -File scripts/verify-start.ps1` 验证启动；持续启动使用 `scripts/start-dev.ps1`。API 默认监听 `http://localhost:3000`，AI 默认监听 `http://localhost:3001`，可访问 `/health` 和 `/v1/capabilities`。
+Windows PowerShell 可运行 `powershell -ExecutionPolicy Bypass -File scripts/verify-start.ps1` 验证启动；该脚本会用合成通知实际跑一次 API→AI 解析链，持续启动使用 `scripts/start-dev.ps1`。API 默认监听 `http://localhost:3000`，AI 默认监听 `http://localhost:3001`，可访问 `/health` 和 `/v1/capabilities`。
 
 复制 `.env.example` 为 `.env.local` 仅供服务端使用。local、test、demo、production 配置和密钥管理必须分离；小程序构建上下文不读取模型密钥。
 

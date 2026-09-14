@@ -5,6 +5,7 @@ Page({
     job: null,
     assessment: null,
     actions: [],
+    resultReady: false,
     error: '',
     canManual: false,
     manualTitle: '',
@@ -26,6 +27,9 @@ Page({
           job,
           assessment: result.document_assessment || null,
           actions: result.verified_actions || [],
+          resultReady: ['succeeded', 'partial', 'needs_confirmation', 'failed'].includes(
+            job.status,
+          ),
           canManual: job.status === 'failed',
           error: '',
         });

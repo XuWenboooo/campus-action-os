@@ -77,6 +77,23 @@ module.exports = {
       data: { actionId },
     });
   },
+  linkTaskNotice(taskId, noticeId) {
+    return request(`/tasks/${taskId}/notices`, {
+      method: 'POST',
+      idempotencyKey: key('task-notice-link'),
+      data: { noticeId, confirmed: true },
+    });
+  },
+  getTaskNoticeSync(taskId) {
+    return request(`/tasks/${taskId}/notice-sync`);
+  },
+  resolveTaskNoticeSync(taskId, syncEventId, decision) {
+    return request(`/tasks/${taskId}/notice-sync/${syncEventId}/resolve`, {
+      method: 'POST',
+      idempotencyKey: key('task-notice-sync'),
+      data: { decision, confirmed: true },
+    });
+  },
   completeTask(taskId) {
     return request(`/tasks/${taskId}/complete`, {
       method: 'POST',

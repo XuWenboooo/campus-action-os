@@ -41,6 +41,19 @@ page {
   color: #b91c1c;
 }
 
+.warning {
+  color: #92400e;
+  font-weight: 600;
+}
+
+.notice-sync {
+  background: #fffbeb;
+  border: 1rpx solid #f59e0b;
+  border-radius: 12rpx;
+  margin-top: 20rpx;
+  padding: 20rpx;
+}
+
 textarea,
 input {
   background: #ffffff;

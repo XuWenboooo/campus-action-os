@@ -1,8 +1,16 @@
 <view class="page">
   <view class="title">任务列表</view>
-  <view class="card" wx:for="{{tasks}}" wx:key="task_id">
-    <view>{{item.title}}</view>
-    <view class="muted">{{item.status}} · {{item.due_at || '无明确截止时间'}}</view>
+  <view class="card" wx:for="{{tasks}}" wx:for-item="task" wx:for-index="index" wx:key="task_id">
+    <view>{{task.title}}</view>
+    <view class="muted">{{task.status}} · {{task.due_at || '无明确截止时间'}}</view>
+    <input value="{{task.noticeIdInput}}" placeholder="已发布通知 ID（可选）" data-index="{{index}}" bindinput="onNoticeInput" />
+    <button class="button secondary" bindtap="linkNotice" data-index="{{index}}">关联通知变更</button>
+    <view class="notice-sync" wx:for="{{task.pendingSync}}" wx:for-item="sync" wx:key="sync_event_id">
+      <view class="warning">待确认通知变更：{{sync.change_type}}</view>
+      <view class="muted">{{sync.reason}}</view>
+      <button class="button" bindtap="resolveSync" data-task-id="{{task.task_id}}" data-event-id="{{sync.sync_event_id}}" data-decision="accept">接受变更</button>
+      <button class="button secondary" bindtap="resolveSync" data-task-id="{{task.task_id}}" data-event-id="{{sync.sync_event_id}}" data-decision="reject">拒绝变更</button>
+    </view>
   </view>
   <view class="card" wx:if="{{!tasks.length}}">暂无任务。</view>
   <view class="danger" wx:if="{{error}}">{{error}}</view>

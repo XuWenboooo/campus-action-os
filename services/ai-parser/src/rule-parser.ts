@@ -162,18 +162,21 @@ export function parseText(request: TextParseRequest): TextParseResponse | Parser
     });
   const parsedActions = actionInputs.map(({ text, line }, index): VerifiedActionObject => {
     const actionId = `${request.document.document_id}:action:${index + 1}`;
+    const evidenceId = (kind: string) =>
+      `${request.document.document_id}:evidence:${kind}:${index + 1}`;
     const actionRelevanceEvidence = relevanceEvidence
-      ? evidence(`ev-relevance-${index + 1}`, relevanceEvidence.source_text, 'user_relevance')
+      ? evidence(evidenceId('relevance'), relevanceEvidence.source_text, 'user_relevance')
       : undefined;
     const populationEvidence = audienceLine
-      ? evidence(`ev-population-${index + 1}`, audienceLine, 'target_population')
+      ? evidence(evidenceId('population'), audienceLine, 'target_population')
       : undefined;
-    const actionEvidence: Evidence[] = [evidence(`ev-step-${index + 1}`, line, 'steps')];
+    const stepEvidenceId = evidenceId('step');
+    const actionEvidence: Evidence[] = [evidence(stepEvidenceId, line, 'steps')];
     const step: ActionStep = {
       step_id: `${actionId}:step:1`,
       instruction: text,
       epistemic_status: 'explicit',
-      evidence_ids: [`ev-step-${index + 1}`],
+      evidence_ids: [stepEvidenceId],
     };
     const materials = materialsLine
       ? materialsLine
@@ -183,32 +186,30 @@ export function parseText(request: TextParseRequest): TextParseResponse | Parser
             material_id: `${actionId}:material:${materialIndex + 1}`,
             description: description.trim(),
             epistemic_status: 'explicit' as const,
-            evidence_ids: [`ev-material-${index + 1}`],
+            evidence_ids: [evidenceId('material')],
           }))
           .filter((item) => item.description)
       : [];
     if (materialsLine)
-      actionEvidence.push(
-        evidence(`ev-material-${index + 1}`, materialsLine, 'required_materials'),
-      );
+      actionEvidence.push(evidence(evidenceId('material'), materialsLine, 'required_materials'));
     const location = locationLine
       ? claim(locationLine.replace(/^.*?(地点|地址)[:：]?\s*/, ''), 'explicit', [
-          `ev-location-${index + 1}`,
+          evidenceId('location'),
         ])
       : null;
     if (locationLine)
-      actionEvidence.push(evidence(`ev-location-${index + 1}`, locationLine, 'location'));
+      actionEvidence.push(evidence(evidenceId('location'), locationLine, 'location'));
     const platform = platformLine
       ? claim(platformLine.replace(/^.*?(平台|系统)[:：]?\s*/, ''), 'explicit', [
-          `ev-platform-${index + 1}`,
+          evidenceId('platform'),
         ])
       : null;
     if (platformLine)
-      actionEvidence.push(evidence(`ev-platform-${index + 1}`, platformLine, 'platform'));
+      actionEvidence.push(evidence(evidenceId('platform'), platformLine, 'platform'));
     const link = source.match(/https?:\/\/[^\s)]+/)?.[0] ?? null;
-    const entryLink = link ? claim(link, 'explicit', [`ev-entry-${index + 1}`]) : null;
+    const entryLink = link ? claim(link, 'explicit', [evidenceId('entry')]) : null;
     if (link)
-      actionEvidence.push(evidence(`ev-entry-${index + 1}`, platformLine ?? link, 'entry_link'));
+      actionEvidence.push(evidence(evidenceId('entry'), platformLine ?? link, 'entry_link'));
     const condition = conditionLine
       ? [
           {
@@ -219,26 +220,26 @@ export function parseText(request: TextParseRequest): TextParseResponse | Parser
               { label: '不满足条件', step_ids: [] },
             ],
             epistemic_status: 'explicit' as const,
-            evidence_ids: [`ev-condition-${index + 1}`],
+            evidence_ids: [evidenceId('condition')],
           },
         ]
       : [];
     if (conditionLine)
-      actionEvidence.push(evidence(`ev-condition-${index + 1}`, conditionLine, 'conditions'));
+      actionEvidence.push(evidence(evidenceId('condition'), conditionLine, 'conditions'));
     const exception = exceptionLine
       ? [
           {
             exception_id: `${actionId}:exception:1`,
             statement: exceptionLine,
             epistemic_status: 'explicit' as const,
-            evidence_ids: [`ev-exception-${index + 1}`],
+            evidence_ids: [evidenceId('exception')],
           },
         ]
       : [];
     if (exceptionLine)
-      actionEvidence.push(evidence(`ev-exception-${index + 1}`, exceptionLine, 'exceptions'));
+      actionEvidence.push(evidence(evidenceId('exception'), exceptionLine, 'exceptions'));
     if (deadlineLine)
-      actionEvidence.push(evidence(`ev-deadline-${index + 1}`, deadlineLine, 'deadline'));
+      actionEvidence.push(evidence(evidenceId('deadline'), deadlineLine, 'deadline'));
     if (actionRelevanceEvidence) actionEvidence.push(actionRelevanceEvidence);
     if (populationEvidence) actionEvidence.push(populationEvidence);
     const status =
@@ -280,7 +281,7 @@ export function parseText(request: TextParseRequest): TextParseResponse | Parser
         boundary_semantics: deadline.boundary,
         timezone: 'Asia/Shanghai',
         epistemic_status: deadline.value ? 'explicit' : 'unknown',
-        evidence_ids: deadline.value ? [`ev-deadline-${index + 1}`] : [],
+        evidence_ids: deadline.value ? [evidenceId('deadline')] : [],
       },
       location,
       platform,

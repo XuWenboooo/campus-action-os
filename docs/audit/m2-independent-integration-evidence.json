@@ -88,8 +88,8 @@
   ],
   "remote_ci": {
     "status": "PASS",
-    "run_id": 34820745689,
-    "head_sha": "9e53b3f4df4318c7d3a3cf058b14d42ffc2ef269",
-    "url": "https://github.com/XuWenboooo/campus-action-os/actions/runs/34820745689"
+    "run_id": 34820992678,
+    "head_sha": "c3d46f22216b87fa9d6444409216130e92c0e722",
+    "url": "https://github.com/XuWenboooo/campus-action-os/actions/runs/34820992678"
   }
 }

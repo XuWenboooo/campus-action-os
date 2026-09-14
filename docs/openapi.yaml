@@ -148,6 +148,26 @@ components:
               title: { type: string, minLength: 1 }
               status: { enum: [pending, in_progress, completed, expired, cancelled] }
               due_at: { anyOf: [{ type: string }, { type: 'null' }] }
+    ManualTaskInput:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [documentId, title, confirmed]
+            properties:
+              documentId: { type: string, minLength: 1 }
+              title: { type: string, minLength: 1, maxLength: 500 }
+              due_at:
+                {
+                  anyOf:
+                    [
+                      { type: string, format: date-time },
+                      { type: string, format: date },
+                      { type: 'null' },
+                    ],
+                }
+              confirmed: { const: true }
   responses:
     Error:
       description: Unified error object
@@ -296,6 +316,19 @@ paths:
             }
       responses:
         { '201': { description: Created task }, '409': { $ref: '#/components/responses/Error' } }
+  /tasks/manual:
+    post:
+      description: Create a user-authored fallback task after parser degradation; no parser claim is implied.
+      security: [{ devUser: [] }]
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody: { $ref: '#/components/requestBodies/ManualTaskInput' }
+      responses:
+        {
+          '201': { description: Created manual task },
+          '400': { $ref: '#/components/responses/Error' },
+          '404': { $ref: '#/components/responses/NotFound' },
+          '409': { $ref: '#/components/responses/Error' },
+        }
   /tasks/{taskId}:
     parameters: [{ $ref: '#/components/parameters/TaskId' }]
     get:

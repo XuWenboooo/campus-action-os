@@ -18,5 +18,12 @@
     <button class="button secondary" bindtap="reject" data-id="{{item.action_id}}">拒绝此行动</button>
   </view>
   <view class="card" wx:if="{{!actions.length && !job.error}}">正在等待解析结果……</view>
+  <view class="card" wx:if="{{canManual}}">
+    <view class="title">解析失败后的人工建任务</view>
+    <view class="muted">没有可靠的解析结果。只有你点击确认后，才会把自定义标题和截止时间落库。</view>
+    <input value="{{manualTitle}}" placeholder="任务标题" maxlength="500" bindinput="onManualTitle" />
+    <input value="{{manualDueAt}}" placeholder="截止时间（可选，如 2099-10-04T12:00:00+08:00）" bindinput="onManualDueAt" />
+    <button class="button" bindtap="manualCreate">确认创建人工任务</button>
+  </view>
   <view class="danger" wx:if="{{error}}">{{error}}</view>
 </view>

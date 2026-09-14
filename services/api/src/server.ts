@@ -629,6 +629,51 @@ async function handle(
     send(response, 201, output, requestId);
     return;
   }
+  if (request.method === 'POST' && path === '/tasks/manual') {
+    const key = idempotencyKey(request, body);
+    const hash = requestHash(body);
+    const previous = repository.getIdempotency(userId, path, key, hash);
+    if (previous === 'conflict')
+      throw new RepositoryError(
+        'IDEMPOTENCY_CONFLICT',
+        409,
+        'Idempotency key was reused with a different request',
+      );
+    if (previous) {
+      send(response, previous.status, previous.body, requestId);
+      return;
+    }
+    if (body.confirmed !== true)
+      throw new RepositoryError(
+        'CONFIRMATION_REQUIRED',
+        400,
+        'Manual task creation requires explicit confirmation',
+      );
+    const dueAt =
+      body.due_at === undefined
+        ? null
+        : body.due_at === null
+          ? null
+          : typeof body.due_at === 'string' && body.due_at.trim().length > 0
+            ? body.due_at.trim()
+            : (() => {
+                throw new RepositoryError(
+                  'INVALID_REQUEST',
+                  400,
+                  'due_at must be a date string or null',
+                );
+              })();
+    const output = repository.createManualTask(
+      userId,
+      stringField(body, 'documentId')!,
+      stringField(body, 'title')!,
+      dueAt,
+      requestId,
+    );
+    repository.saveIdempotency(userId, path, key, hash, 201, output);
+    send(response, 201, output, requestId);
+    return;
+  }
   if (
     segments[0] === 'tasks' &&
     segments[1] &&

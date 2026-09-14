@@ -874,6 +874,185 @@ export class Repository {
     return task;
   }
 
+  createManualTask(
+    userId: string,
+    documentId: string,
+    title: string,
+    dueAt: string | null,
+    requestId: string,
+  ): { action: VerifiedActionObject; task: Task } {
+    const document = this.getDocument(userId, documentId);
+    if (!document) throw new RepositoryError('DOCUMENT_NOT_FOUND', 404, 'Document not found');
+    const timestamp = now();
+    const actionId = `${documentId}:manual-action:${randomUUID()}`;
+    const evidenceId = `${actionId}:evidence:manual`;
+    const action: VerifiedActionObject = {
+      schema_version: 'verified-action-object/v1',
+      action_id: actionId,
+      document_id: documentId,
+      title: title.trim(),
+      target_population: ['当前用户'],
+      user_relevance: 'relevant',
+      relevance_reason: '用户在解析降级后手动创建行动',
+      action_type: 'manual_task',
+      steps: [
+        {
+          step_id: `${actionId}:step:1`,
+          instruction: title.trim(),
+          epistemic_status: 'explicit',
+          evidence_ids: [evidenceId],
+        },
+      ],
+      dependencies: [],
+      conditions: [],
+      exceptions: [],
+      deadline: {
+        value: null,
+        precision: 'unknown',
+        boundary_semantics: 'unknown',
+        epistemic_status: 'unknown',
+        evidence_ids: [],
+      },
+      location: null,
+      platform: null,
+      entry_link: null,
+      required_materials: [],
+      consequence: null,
+      obligation: 'unknown',
+      evidence: [
+        {
+          evidence_id: evidenceId,
+          source_text: title.trim(),
+          page_or_image: 'manual:user-input',
+          field_name: 'steps',
+          epistemic_status: 'explicit',
+        },
+      ],
+      confidence: { score: 1, basis: 'user_confirmed' },
+      epistemic_status: 'explicit',
+      field_status: {
+        user_relevance: 'unknown',
+        target_population: 'unknown',
+        steps: 'explicit',
+        deadline: 'unknown',
+        required_materials: 'unknown',
+        location: 'unknown',
+        platform: 'unknown',
+        conditions: 'unknown',
+        exceptions: 'unknown',
+      },
+      result_stage: 'user_confirmed',
+      verification_status: 'passed',
+      task_status: 'pending',
+      change_history: [
+        {
+          change_id: randomUUID(),
+          occurred_at: timestamp,
+          actor: 'user',
+          change_type: 'created',
+          reason: 'Manual task fallback after parser degradation',
+        },
+      ],
+    };
+    const validAction = validateVerifiedActionObject(action);
+    if (!validAction.ok)
+      throw new RepositoryError(
+        'INVALID_ACTION',
+        400,
+        validAction.errors[0]?.message ?? 'Invalid manual action',
+      );
+    const task: Task = {
+      schema_version: 'task/v1',
+      task_id: randomUUID(),
+      user_id: userId,
+      action_id: actionId,
+      document_id: documentId,
+      title: title.trim(),
+      status: 'pending',
+      due_at: dueAt,
+      created_at: timestamp,
+      updated_at: timestamp,
+      completed_at: null,
+    };
+    const validTask = validateTask(task);
+    if (!validTask.ok)
+      throw new RepositoryError(
+        'INVALID_TASK',
+        400,
+        validTask.errors[0]?.message ?? 'Invalid manual task',
+      );
+    this.db.exec('BEGIN');
+    try {
+      this.db
+        .prepare(
+          'INSERT INTO verified_actions (action_id, document_id, user_id, payload_json, result_stage, verification_status, task_status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        )
+        .run(
+          action.action_id,
+          action.document_id,
+          userId,
+          json(action),
+          action.result_stage,
+          action.verification_status,
+          action.task_status,
+          timestamp,
+          timestamp,
+        );
+      this.db
+        .prepare(
+          'INSERT INTO evidence (evidence_id, action_id, field_name, source_text, page_or_image, bounding_box_json, epistemic_status) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        )
+        .run(
+          evidenceId,
+          action.action_id,
+          'steps',
+          title.trim(),
+          'manual:user-input',
+          null,
+          'explicit',
+        );
+      insertActionChanges(this.db, action);
+      this.db
+        .prepare(
+          'INSERT INTO tasks (task_id, user_id, action_id, document_id, title, status, due_at, completed_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        )
+        .run(
+          task.task_id,
+          task.user_id,
+          task.action_id,
+          task.document_id,
+          task.title,
+          task.status,
+          task.due_at,
+          task.completed_at,
+          task.created_at,
+          task.updated_at,
+        );
+      this.db
+        .prepare(
+          'INSERT INTO task_events (event_id, task_id, from_status, to_status, reason, request_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        )
+        .run(
+          randomUUID(),
+          task.task_id,
+          null,
+          task.status,
+          'Manual task fallback after parser degradation',
+          requestId,
+          timestamp,
+        );
+      this.recordAudit(requestId, userId, 'manual_task.created', 'task', task.task_id, {
+        document_id: documentId,
+        action_id: actionId,
+      });
+      this.db.exec('COMMIT');
+    } catch (error) {
+      this.db.exec('ROLLBACK');
+      throw error;
+    }
+    return { action: validAction.value, task: validTask.value };
+  }
+
   listTasks(userId: string): Task[] {
     return (
       this.db

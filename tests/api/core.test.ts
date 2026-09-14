@@ -298,6 +298,131 @@ test('API persists parser outage as a failed ParseJob instead of a fake success'
   }
 });
 
+test('API retains the source document and creates an explicit manual task after parser failure', async () => {
+  const repository = new Repository(':memory:');
+  const api = createApiServer({ repository, parserUrl: 'http://127.0.0.1:1' });
+  const url = await listen(api.server);
+  const headers = {
+    'content-type': 'application/json',
+    'x-dev-user-id': 'manual-fallback-student',
+  };
+  const call = async (
+    method: string,
+    path: string,
+    body?: unknown,
+    extra: Record<string, string> = {},
+  ) => {
+    const result = await fetch(`${url}${path}`, {
+      method,
+      headers: { ...headers, ...extra },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+    return { result, body: result.status === 204 ? null : await result.json() };
+  };
+  try {
+    const sourceText = '【合成降级通知】\n适用对象：本科生\n请根据原文自行创建任务。';
+    const created = await call(
+      'POST',
+      '/documents',
+      { title: '保留原文的合成通知', text: sourceText, data_origin: 'synthetic' },
+      { 'idempotency-key': 'manual-document-1' },
+    );
+    assert.equal(created.result.status, 201);
+    const documentId = created.body.document.document_id as string;
+    const failed = await call(
+      'POST',
+      `/documents/${documentId}/parse`,
+      {},
+      { 'idempotency-key': 'manual-parse-1' },
+    );
+    assert.equal(failed.result.status, 202);
+    assert.equal(failed.body.status, 'failed');
+    assert.equal(failed.body.error.code, 'PARSER_NOT_CONFIGURED');
+
+    const noConfirmation = await call(
+      'POST',
+      '/tasks/manual',
+      { documentId, title: '手动完成登记', due_at: '2099-10-04T12:00:00+08:00' },
+      { 'idempotency-key': 'manual-task-1' },
+    );
+    assert.equal(noConfirmation.result.status, 400);
+    assert.equal(noConfirmation.body.error.code, 'CONFIRMATION_REQUIRED');
+
+    const manualInput = {
+      documentId,
+      title: '手动完成登记',
+      due_at: '2099-10-04T12:00:00+08:00',
+      confirmed: true,
+    };
+    const manual = await call('POST', '/tasks/manual', manualInput, {
+      'idempotency-key': 'manual-task-1',
+      'x-request-id': 'manual-task-request-1',
+    });
+    assert.equal(manual.result.status, 201);
+    assert.equal(manual.result.headers.get('x-request-id'), 'manual-task-request-1');
+    assert.equal(manual.body.action.result_stage, 'user_confirmed');
+    assert.equal(manual.body.action.verification_status, 'passed');
+    assert.equal(manual.body.action.action_type, 'manual_task');
+    assert.equal(manual.body.action.evidence[0].page_or_image, 'manual:user-input');
+    assert.equal(manual.body.task.status, 'pending');
+    assert.equal(manual.body.task.due_at, manualInput.due_at);
+    const replay = await call('POST', '/tasks/manual', manualInput, {
+      'idempotency-key': 'manual-task-1',
+    });
+    assert.equal(replay.result.status, 201);
+    assert.deepEqual(replay.body, manual.body);
+    const conflict = await call(
+      'POST',
+      '/tasks/manual',
+      { ...manualInput, title: '同一 key 的不同人工任务' },
+      { 'idempotency-key': 'manual-task-1' },
+    );
+    assert.equal(conflict.result.status, 409);
+    assert.equal(conflict.body.error.code, 'IDEMPOTENCY_CONFLICT');
+
+    const source = await call('GET', `/documents/${documentId}`);
+    assert.equal(source.result.status, 200);
+    assert.equal(source.body.document.text, sourceText);
+    assert.equal(
+      (
+        repository.db
+          .prepare(
+            "SELECT count(*) AS count FROM audit_events WHERE event_type = 'manual_task.created'",
+          )
+          .get() as { count: number }
+      ).count,
+      1,
+    );
+    assert.equal(
+      (
+        repository.db
+          .prepare('SELECT count(*) AS count FROM evidence WHERE action_id = ?')
+          .get(manual.body.action.action_id) as { count: number }
+      ).count,
+      1,
+    );
+    const started = await call(
+      'PATCH',
+      `/tasks/${manual.body.task.task_id}`,
+      { status: 'in_progress' },
+      { 'idempotency-key': 'manual-start-1' },
+    );
+    assert.equal(started.result.status, 200);
+    assert.equal(started.body.task.status, 'in_progress');
+    const completed = await call(
+      'POST',
+      `/tasks/${manual.body.task.task_id}/complete`,
+      { confirmed: true },
+      { 'idempotency-key': 'manual-complete-1' },
+    );
+    assert.equal(completed.result.status, 200);
+    assert.equal(completed.body.task.status, 'completed');
+  } finally {
+    await close(api.server);
+    repository.close();
+  }
+});
+
 test('API aborts a stalled parser request and persists PARSER_TIMEOUT', async () => {
   const slowParser = createServer((_request, response) => {
     setTimeout(() => response.writeHead(200).end('{}'), 200);

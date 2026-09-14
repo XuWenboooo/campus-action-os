@@ -8,7 +8,7 @@
 
 ## 当前阶段
 
-可运行底座检查点：已提供冻结 v1 公共 Schema/运行时校验、Node 26 SQLite 迁移与 Repository、受限图片/PDF 二进制上传持久化、角色闸门、规则解析 HTTP 服务、Document → ParseJob → VerifiedActionObject → 用户确认 → Task 闭环、统一错误/幂等/requestId、强化 Error Shield 和 30 条合成评测。真实 OCR/provider、微信人工验证、正式 800 条评测和生产能力仍未实现。
+可运行底座检查点：已提供冻结 v1 公共 Schema/运行时校验、Node 26 SQLite 迁移与 Repository、受限图片/PDF 二进制上传持久化、角色闸门、规则解析 HTTP 服务、Document → ParseJob → VerifiedActionObject → 用户确认 → Task 闭环、解析失败后的用户确认人工建任务回退、统一错误/幂等/requestId、强化 Error Shield 和 30 条合成评测。真实 OCR/provider、微信人工验证、正式 800 条评测和生产能力仍未实现。
 
 ## 目录
 

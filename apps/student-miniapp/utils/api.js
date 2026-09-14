@@ -46,6 +46,27 @@ module.exports = {
       data: { title: '微信导入通知', text, data_origin: 'user_provided' },
     });
   },
+  uploadMediaDocument(filePath, contentType, title) {
+    return new Promise((resolve, reject) => {
+      wx.getFileSystemManager().readFile({
+        filePath,
+        encoding: 'base64',
+        success(file) {
+          request('/documents/upload', {
+            method: 'POST',
+            idempotencyKey: key('document-upload'),
+            data: {
+              title: title || '微信导入通知',
+              contentType,
+              content_base64: file.data,
+              data_origin: 'user_provided',
+            },
+          }).then(resolve, reject);
+        },
+        fail: reject,
+      });
+    });
+  },
   parseDocument(documentId) {
     return request(`/documents/${documentId}/parse`, {
       method: 'POST',
@@ -75,6 +96,13 @@ module.exports = {
       method: 'POST',
       idempotencyKey: key('task'),
       data: { actionId },
+    });
+  },
+  createManualTask(documentId, title, dueAt) {
+    return request('/tasks/manual', {
+      method: 'POST',
+      idempotencyKey: key('manual-task'),
+      data: { documentId, title, due_at: dueAt || null, confirmed: true },
     });
   },
   linkTaskNotice(taskId, noticeId) {

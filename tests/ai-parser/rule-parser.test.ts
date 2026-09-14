@@ -149,3 +149,22 @@ test('document normalizer accepts only an injected OCR result for media', async 
     assert.match(result.text, /提交 PDF/);
   }
 });
+
+test('rule parser represents conditional actions with decision and branch graph nodes', () => {
+  const result = parseText(
+    request(
+      '【合成条件通知】\n适用对象：本科生\n条件：若未完成认证，先完成认证\n1. 完成认证\n2. 提交申请\n截止：2099-10-03 17:00 前',
+    ),
+  );
+  assert.equal('code' in result, false);
+  if ('code' in result) return;
+  const graph = result.action_graph;
+  assert.ok(graph);
+  assert.ok(graph.nodes.some((node) => node.node_type === 'decision'));
+  assert.ok(
+    graph.edges.some(
+      (edge) => edge.edge_type === 'branches_to' && typeof edge.condition_id === 'string',
+    ),
+  );
+  assert.equal(validateTextParseResponse(result).ok, true);
+});

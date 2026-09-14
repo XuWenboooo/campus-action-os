@@ -11,5 +11,6 @@
 - 增加 HTML 文本标准化，以及图片/PDF 的显式 `OCR_NOT_CONFIGURED` 降级路径和测试；未把未配置 OCR 伪装为成功。
 - 增加 parser AbortSignal 超时、`PARSER_TIMEOUT` 持久化、生产环境身份认证闸门和文档删除确认测试。
 - 增加可注入、可审计的 `OcrProvider` 契约；默认 provider 明确不运行，synthetic provider 仅用于测试图片/PDF 文本进入同一解析闭环。
+- 补齐条件动作的 Action Graph 语义：显式条件现在生成 `decision` 节点和带 `condition_id` 的 `branches_to` 边，并加入协议校验测试。
 
 仍为 `NOT_READY`：真实 OCR/provider、正式 800 条冻结评测、微信开发者工具人工验证、真实认证/提醒和生产部署均缺失；本地测试不能替代这些证据。

@@ -132,7 +132,7 @@ export function parseText(request: TextParseRequest): TextParseResponse | Parser
   const materialsLine = lineFor(source, /材料|携带|提交.*(证件|证明|附件)/);
   const locationLine = lineFor(source, /地点|地址|教室|现场/);
   const platformLine = lineFor(source, /平台|系统|线上|邮箱|链接|网址/);
-  const conditionLine = lineFor(source, /条件|要求|仅限|须知|须满足/);
+  const conditionLine = lineFor(source, /条件|要求|仅限|须知|须满足|如果|若/);
   const exceptionLine = lineFor(source, /除.*外|不适用于|例外/);
   const deadline = isoDeadline(deadlineLine);
   const warnings: TextParseResponse['warnings'] = [];
@@ -387,17 +387,36 @@ export function parseText(request: TextParseRequest): TextParseResponse | Parser
 }
 
 function buildGraph(actions: VerifiedActionObject[], documentId: string): ActionGraph {
-  const nodes = actions.map((action) => ({
+  const nodes: ActionGraph['nodes'] = actions.map((action) => ({
     node_id: `${action.action_id}:node`,
     node_type: 'action' as const,
     action_id: action.action_id,
   }));
-  const edges = nodes.slice(1).map((node, index) => ({
+  const edges: ActionGraph['edges'] = nodes.slice(1).map((node, index) => ({
     edge_id: `${documentId}:edge:${index + 1}`,
     from_node_id: nodes[index].node_id,
     to_node_id: node.node_id,
     edge_type: 'blocks' as const,
   }));
+  let branchIndex = 0;
+  for (const action of actions) {
+    for (const condition of action.conditions) {
+      branchIndex += 1;
+      const decisionNodeId = `${action.action_id}:decision:${condition.condition_id}`;
+      nodes.push({
+        node_id: decisionNodeId,
+        node_type: 'decision',
+        condition_ids: [condition.condition_id],
+      });
+      edges.push({
+        edge_id: `${documentId}:branch:${branchIndex}`,
+        from_node_id: decisionNodeId,
+        to_node_id: `${action.action_id}:node`,
+        edge_type: 'branches_to',
+        condition_id: condition.condition_id,
+      });
+    }
+  }
   return { schema_version: 'action-graph/v1', graph_id: `${documentId}:graph`, nodes, edges };
 }
 

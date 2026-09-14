@@ -199,6 +199,13 @@ test('API closes the document → parse job → verified action → confirmed ta
     assert.equal(unknown.result.status, 404);
     assert.equal(unknown.result.headers.get('x-request-id'), 'client-request-1');
     assert.equal(unknown.parsed.error.requestId, 'client-request-1');
+    const deleteMissingConfirmation = await call('DELETE', `/documents/${documentId}`);
+    assert.equal(deleteMissingConfirmation.result.status, 400);
+    assert.equal(deleteMissingConfirmation.parsed.error.code, 'CONFIRMATION_REQUIRED');
+    const deleted = await call('DELETE', `/documents/${documentId}`, { confirmed: true });
+    assert.equal(deleted.result.status, 204);
+    const deletedRead = await call('GET', `/documents/${documentId}`);
+    assert.equal(deletedRead.result.status, 404);
   } finally {
     await close(api.server);
     await close(ai);

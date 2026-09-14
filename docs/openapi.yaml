@@ -79,6 +79,7 @@ paths:
         { '200': { description: Document }, '404': { $ref: '#/components/responses/NotFound' } }
     delete:
       security: [{ devUser: [] }]
+      requestBody: { $ref: '#/components/requestBodies/Confirmation' }
       responses:
         { '204': { description: Deleted }, '404': { $ref: '#/components/responses/NotFound' } }
   /documents/{documentId}/parse:

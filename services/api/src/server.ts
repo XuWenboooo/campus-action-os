@@ -209,10 +209,7 @@ async function handle(
     .filter(Boolean)
     .map((part) => decodeURIComponent(part));
   const userId = currentUser(request, repository);
-  const body =
-    request.method === 'GET' || request.method === 'DELETE'
-      ? {}
-      : bodyObject(await readJson(request));
+  const body = request.method === 'GET' ? {} : bodyObject(await readJson(request));
   const parserBaseUrl = options.parserUrl ?? parserUrl;
 
   if (request.method === 'GET' && path === '/health') {
@@ -322,6 +319,12 @@ async function handle(
     request.method === 'DELETE' &&
     segments.length === 2
   ) {
+    if (body.confirmed !== true)
+      throw new RepositoryError(
+        'CONFIRMATION_REQUIRED',
+        400,
+        'Deleting a document requires explicit confirmation',
+      );
     if (!repository.deleteDocument(userId, segments[1]))
       throw new RepositoryError('DOCUMENT_NOT_FOUND', 404, 'Document not found');
     send(response, 204, null, requestId);

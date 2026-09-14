@@ -223,6 +223,14 @@ test('API closes the document → parse job → verified action → confirmed ta
     const task = await call('POST', '/tasks', { actionId }, { 'idempotency-key': 'task-loop-1' });
     assert.equal(task.result.status, 201);
     assert.equal(task.parsed.task.status, 'pending');
+    const customDueAt = await call(
+      'PATCH',
+      `/tasks/${task.parsed.task.task_id}`,
+      { due_at: '2099-10-10' },
+      { 'idempotency-key': 'task-custom-due-1' },
+    );
+    assert.equal(customDueAt.result.status, 200);
+    assert.equal(customDueAt.parsed.task.due_at, '2099-10-10');
     const actionEditedAfterTask = await call(
       'PATCH',
       `/actions/${actionId}`,
@@ -233,6 +241,7 @@ test('API closes the document → parse job → verified action → confirmed ta
     const syncedTask = await call('GET', `/tasks/${task.parsed.task.task_id}`);
     assert.equal(syncedTask.result.status, 200);
     assert.equal(syncedTask.parsed.task.title, '任务标题同步后的版本');
+    assert.equal(syncedTask.parsed.task.due_at, '2099-10-10');
     const invalidTaskPatch = await call(
       'PATCH',
       `/tasks/${task.parsed.task.task_id}`,
@@ -281,6 +290,14 @@ test('API closes the document → parse job → verified action → confirmed ta
     assert.deepEqual(completedReplay.parsed, completed.parsed);
     const actionAfterComplete = await call('GET', `/actions/${actionId}`);
     assert.equal(actionAfterComplete.parsed.action.task_status, 'completed');
+    const rejectCompleted = await call(
+      'POST',
+      `/actions/${actionId}/reject`,
+      { rejected: true },
+      { 'idempotency-key': 'reject-completed-action-1' },
+    );
+    assert.equal(rejectCompleted.result.status, 409);
+    assert.equal(rejectCompleted.parsed.error.code, 'INVALID_STATE_TRANSITION');
     const illegal = await call(
       'PATCH',
       `/tasks/${task.parsed.task.task_id}`,

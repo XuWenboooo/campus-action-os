@@ -733,6 +733,12 @@ export class Repository {
       );
     const action = this.getAction(userId, actionId);
     if (!action) throw new RepositoryError('ACTION_NOT_FOUND', 404, 'Action not found');
+    if (action.task_status === 'completed')
+      throw new RepositoryError(
+        'INVALID_STATE_TRANSITION',
+        409,
+        'A completed action cannot be rejected',
+      );
     const changed: VerifiedActionObject = {
       ...action,
       verification_status: 'conflict',
@@ -783,7 +789,10 @@ export class Repository {
         400,
         valid.errors[0]?.message ?? 'Invalid action',
       );
-    this.saveAction(userId, valid.value, requestId, 'action.updated');
+    this.saveAction(userId, valid.value, requestId, 'action.updated', {
+      title: patch.title !== undefined,
+      deadline: patch.deadline !== undefined,
+    });
     return valid.value;
   }
 
@@ -792,6 +801,10 @@ export class Repository {
     action: VerifiedActionObject,
     requestId: string,
     eventType: string,
+    syncTaskFields: { title: boolean; deadline: boolean } = {
+      title: false,
+      deadline: false,
+    },
   ): void {
     const updatedAt = now();
     this.db.exec('BEGIN');
@@ -841,19 +854,23 @@ export class Repository {
             action_id: action.action_id,
             from_status: previousStatus,
           });
-        } else if (
-          text(taskRow.title) !== action.title ||
-          (taskRow.due_at === null ? null : text(taskRow.due_at)) !== action.deadline.value
-        ) {
+        } else {
+          const nextTitle = syncTaskFields.title ? action.title : text(taskRow.title);
+          const nextDueAt = syncTaskFields.deadline
+            ? action.deadline.value
+            : taskRow.due_at === null
+              ? null
+              : text(taskRow.due_at);
+          if (nextTitle === text(taskRow.title) && nextDueAt === (taskRow.due_at ?? null)) continue;
           this.db
             .prepare(
               'UPDATE tasks SET title = ?, due_at = ?, updated_at = ? WHERE task_id = ? AND user_id = ?',
             )
-            .run(action.title, action.deadline.value, updatedAt, taskId, userId);
+            .run(nextTitle, nextDueAt, updatedAt, taskId, userId);
           this.recordAudit(requestId, userId, 'task.synced_from_action', 'task', taskId, {
             action_id: action.action_id,
-            title: action.title,
-            due_at: action.deadline.value,
+            title: syncTaskFields.title ? action.title : undefined,
+            due_at: syncTaskFields.deadline ? action.deadline.value : undefined,
           });
         }
       }

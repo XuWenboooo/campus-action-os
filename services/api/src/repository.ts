@@ -314,7 +314,7 @@ export class Repository {
     return valid.value;
   }
 
-  updateProfile(userId: string, profile: UserProfile): PublicUserProfile {
+  updateProfile(userId: string, profile: UserProfile, requestId?: string): PublicUserProfile {
     this.ensureUser(userId);
     const current = this.getProfile(userId);
     const {
@@ -341,6 +341,10 @@ export class Repository {
     this.db
       .prepare('UPDATE user_profiles SET profile_json = ?, updated_at = ? WHERE user_id = ?')
       .run(json(merged), updatedAt, userId);
+    if (requestId)
+      this.recordAudit(requestId, userId, 'profile.updated', 'user', userId, {
+        fields: Object.keys(profile).sort(),
+      });
     return valid.value;
   }
 

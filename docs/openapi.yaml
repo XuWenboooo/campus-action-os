@@ -207,6 +207,7 @@ paths:
   /users/me/profile:
     patch:
       security: [{ devUser: [] }]
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
       requestBody:
         required: true
         content:

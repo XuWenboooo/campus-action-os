@@ -133,6 +133,10 @@ module.exports = {
     return request('/users/me');
   },
   updateProfile(data) {
-    return request('/users/me/profile', { method: 'PATCH', data });
+    return request('/users/me/profile', {
+      method: 'PATCH',
+      idempotencyKey: key('profile'),
+      data,
+    });
   },
 };

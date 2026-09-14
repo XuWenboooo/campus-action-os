@@ -363,6 +363,19 @@ async function handle(
     return;
   }
   if (request.method === 'PATCH' && path === '/users/me/profile') {
+    const key = idempotencyKey(request, body);
+    const hash = requestHash(body);
+    const previous = repository.getIdempotency(userId, path, key, hash);
+    if (previous === 'conflict')
+      throw new RepositoryError(
+        'IDEMPOTENCY_CONFLICT',
+        409,
+        'Idempotency key was reused with a different request',
+      );
+    if (previous) {
+      send(response, previous.status, previous.body, requestId);
+      return;
+    }
     const profile: UserProfile = {};
     for (const key of ['education_level', 'grade', 'college', 'major', 'campus'] as const)
       if (body[key] !== undefined) {
@@ -376,7 +389,9 @@ async function handle(
           throw new RepositoryError('INVALID_REQUEST', 400, `${key} must be an array of strings`);
         profile[key] = body[key] as string[];
       }
-    send(response, 200, repository.updateProfile(userId, profile), requestId);
+    const output = repository.updateProfile(userId, profile, requestId);
+    repository.saveIdempotency(userId, path, key, hash, 200, output);
+    send(response, 200, output, requestId);
     return;
   }
 

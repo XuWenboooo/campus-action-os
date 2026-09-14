@@ -41,12 +41,39 @@ test('API closes the document → parse job → verified action → confirmed ta
   };
 
   try {
-    const profile = await call('PATCH', '/users/me/profile', {
+    const profileInput = {
       education_level: '本科生',
       grade: '大三',
       college: '虚构学院',
+    };
+    const profile = await call('PATCH', '/users/me/profile', profileInput, {
+      'idempotency-key': 'profile-1',
+      'x-request-id': 'profile-request-1',
     });
     assert.equal(profile.result.status, 200);
+    assert.equal(profile.result.headers.get('x-request-id'), 'profile-request-1');
+    const profileReplay = await call('PATCH', '/users/me/profile', profileInput, {
+      'idempotency-key': 'profile-1',
+    });
+    assert.deepEqual(profileReplay.parsed, profile.parsed);
+    const profileConflict = await call(
+      'PATCH',
+      '/users/me/profile',
+      { ...profileInput, grade: '大四' },
+      { 'idempotency-key': 'profile-1' },
+    );
+    assert.equal(profileConflict.result.status, 409);
+    assert.equal(profileConflict.parsed.error.code, 'IDEMPOTENCY_CONFLICT');
+    assert.equal(
+      (
+        repository.db
+          .prepare(
+            "SELECT count(*) AS count FROM audit_events WHERE event_type = 'profile.updated'",
+          )
+          .get() as { count: number }
+      ).count,
+      1,
+    );
     const invalidOrigin = await call(
       'POST',
       '/documents',

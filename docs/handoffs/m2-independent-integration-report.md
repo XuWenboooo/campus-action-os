@@ -4,8 +4,8 @@
 
 `FINAL STATUS: PASS`
 
-Runbook: `CAOS-M2-INDEPENDENT-INTEGRATION-FLOW-v1.0`  
-Baseline: `m2-text-contract-v0.1.0@d89afe123ba38368b9ee2fdeb4049243107fde84`  
+Runbook: `CAOS-M2-INDEPENDENT-INTEGRATION-FLOW-v1.0`
+Baseline: `m2-text-contract-v0.1.0@d89afe123ba38368b9ee2fdeb4049243107fde84`
 Feature branch: `integration/m2-independent-integration-flow`
 
 ## Delivered

@@ -1,8 +1,8 @@
 # M2 independent integration execution log
 
-Runbook: `CAOS-M2-INDEPENDENT-INTEGRATION-FLOW-v1.0`  
-Baseline: `m2-text-contract-v0.1.0` at `d89afe123ba38368b9ee2fdeb4049243107fde84`  
-Worktree: `F:\项目\腾讯小程序-m2-integration`  
+Runbook: `CAOS-M2-INDEPENDENT-INTEGRATION-FLOW-v1.0`
+Baseline: `m2-text-contract-v0.1.0` at `d89afe123ba38368b9ee2fdeb4049243107fde84`
+Worktree: `F:\项目\腾讯小程序-m2-integration`
 Branch: `integration/m2-independent-integration-flow`
 
 ## Scope gate

@@ -2,6 +2,9 @@
   "name": "campus-action-os",
   "private": true,
   "type": "module",
+  "engines": {
+    "node": ">=22.5.0"
+  },
   "workspaces": [
     "apps/*",
     "services/*",
@@ -23,6 +26,14 @@
     "schema:check": "node scripts/run-python-checks.mjs integration",
     "test:python": "node scripts/run-python-checks.mjs all",
     "test:m2": "node --test --import tsx tests/contracts/m2-text-contract.test.ts tests/e2e/m2-text-harness.test.ts",
+    "db:migrate": "tsx database/migrate.ts",
+    "test:api": "node --test --import tsx tests/api/**/*.test.ts",
+    "test:e2e": "node --test --import tsx tests/api/**/*.test.ts tests/e2e/**/*.test.ts",
+    "test:db": "node --test --import tsx tests/database/**/*.test.ts",
+    "test:fixtures": "node --test --import tsx tests/fixtures/**/*.test.ts",
+    "test:evaluation": "node --test --import tsx tests/evaluation/**/*.test.ts",
+    "evaluate:fixtures": "tsx tools/evaluation/run.ts",
+    "start:verify": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/verify-start.ps1",
     "dev:mock": "tsx tools/integration/mock-ai-parser/server.ts",
     "release:m2-manifest:verify": "node scripts/m2-manifest.mjs",
     "release:manifest:verify": "node scripts/m1-manifest.mjs verify",

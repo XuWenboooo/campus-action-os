@@ -1,0 +1,283 @@
+openapi: 3.1.0
+info:
+  title: Campus Action OS API
+  version: 0.1.0-foundation
+  description: Local/test API for the evidence-backed document-to-task foundation.
+servers:
+  - url: http://localhost:3000
+components:
+  securitySchemes:
+    devUser:
+      type: apiKey
+      in: header
+      name: x-dev-user-id
+  schemas:
+    Error:
+      $ref: ../schemas/interfaces/v1/error.schema.json
+    Document:
+      $ref: ../schemas/interfaces/v1/document.schema.json
+    ParseJob:
+      $ref: ../schemas/interfaces/v1/parse-job.schema.json
+    Task:
+      $ref: ../schemas/interfaces/v1/task.schema.json
+    NotificationRevision:
+      $ref: ../schemas/interfaces/v1/notification-revision.schema.json
+paths:
+  /health:
+    get:
+      responses:
+        '200': { description: Healthy }
+  /ready:
+    get:
+      responses:
+        '200': { description: Ready }
+  /auth/dev-login:
+    post:
+      description: Development-only login; disabled when APP_ENV=production.
+      requestBody:
+        required: false
+        content:
+          application/json: { schema: { type: object, properties: { userId: { type: string } } } }
+      responses:
+        '200': { description: Development session }
+        '403': { description: Disabled in production }
+  /users/me:
+    get:
+      security: [{ devUser: [] }]
+      responses:
+        '200': { description: Current user and profile }
+  /users/me/profile:
+    patch:
+      security: [{ devUser: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json: { schema: { $ref: ../schemas/interfaces/v1/user-profile.schema.json } }
+      responses:
+        '200': { description: Updated profile }
+  /documents:
+    post:
+      security: [{ devUser: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+      requestBody: { $ref: '#/components/requestBodies/DocumentInput' }
+      responses:
+        '201': { description: Created document }
+  /documents/upload:
+    post:
+      security: [{ devUser: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+      requestBody: { $ref: '#/components/requestBodies/DocumentInput' }
+      responses:
+        '201': { description: Created document }
+  /documents/{documentId}:
+    parameters: [{ $ref: '#/components/parameters/DocumentId' }]
+    get:
+      security: [{ devUser: [] }]
+      responses:
+        { '200': { description: Document }, '404': { $ref: '#/components/responses/NotFound' } }
+    delete:
+      security: [{ devUser: [] }]
+      responses:
+        { '204': { description: Deleted }, '404': { $ref: '#/components/responses/NotFound' } }
+  /documents/{documentId}/parse:
+    post:
+      security: [{ devUser: [] }]
+      parameters:
+        - { $ref: '#/components/parameters/DocumentId' }
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+      responses:
+        { '202': { description: Parse job }, '404': { $ref: '#/components/responses/NotFound' } }
+  /documents/{documentId}/actions:
+    get:
+      security: [{ devUser: [] }]
+      parameters: [{ $ref: '#/components/parameters/DocumentId' }]
+      responses: { '200': { description: Verified Action Objects } }
+  /parse-jobs/{parseJobId}:
+    get:
+      security: [{ devUser: [] }]
+      parameters: [{ $ref: '#/components/parameters/ParseJobId' }]
+      responses:
+        { '200': { description: Parse job }, '404': { $ref: '#/components/responses/NotFound' } }
+  /actions/{actionId}/confirm:
+    post:
+      security: [{ devUser: [] }]
+      parameters: [{ $ref: '#/components/parameters/ActionId' }]
+      requestBody: { $ref: '#/components/requestBodies/Confirmation' }
+      responses:
+        {
+          '200': { description: Confirmed action },
+          '400': { $ref: '#/components/responses/Error' },
+        }
+  /actions/{actionId}/reject:
+    post:
+      security: [{ devUser: [] }]
+      parameters: [{ $ref: '#/components/parameters/ActionId' }]
+      requestBody: { $ref: '#/components/requestBodies/Rejection' }
+      responses: { '200': { description: Rejected action } }
+  /actions/{actionId}:
+    get:
+      security: [{ devUser: [] }]
+      parameters: [{ $ref: '#/components/parameters/ActionId' }]
+      responses:
+        {
+          '200': { description: Verified Action Object },
+          '404': { $ref: '#/components/responses/NotFound' },
+        }
+    patch:
+      security: [{ devUser: [] }]
+      parameters: [{ $ref: '#/components/parameters/ActionId' }]
+      responses: { '200': { description: Updated action } }
+  /tasks:
+    get:
+      security: [{ devUser: [] }]
+      responses: { '200': { description: Tasks } }
+    post:
+      security: [{ devUser: [] }]
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            {
+              schema:
+                {
+                  type: object,
+                  required: [actionId],
+                  properties: { actionId: { type: string }, title: { type: string } },
+                },
+            }
+      responses:
+        { '201': { description: Created task }, '409': { $ref: '#/components/responses/Error' } }
+  /tasks/{taskId}:
+    parameters: [{ $ref: '#/components/parameters/TaskId' }]
+    get:
+      security: [{ devUser: [] }]
+      responses: { '200': { description: Task } }
+    patch:
+      security: [{ devUser: [] }]
+      responses:
+        { '200': { description: Updated task }, '409': { $ref: '#/components/responses/Error' } }
+  /tasks/{taskId}/complete:
+    post:
+      security: [{ devUser: [] }]
+      parameters: [{ $ref: '#/components/parameters/TaskId' }]
+      requestBody: { $ref: '#/components/requestBodies/Confirmation' }
+      responses: { '200': { description: Completed task } }
+  /notices:
+    post:
+      security: [{ devUser: [] }]
+      requestBody: { $ref: '#/components/requestBodies/NoticeInput' }
+      responses: { '201': { description: Draft notice } }
+  /notices/{noticeId}:
+    get:
+      security: [{ devUser: [] }]
+      parameters: [{ $ref: '#/components/parameters/NoticeId' }]
+      responses: { '200': { description: Notice and revision history } }
+  /notices/{noticeId}/publish:
+    post:
+      security: [{ devUser: [] }]
+      parameters: [{ $ref: '#/components/parameters/NoticeId' }]
+      requestBody: { $ref: '#/components/requestBodies/Confirmation' }
+      responses: { '200': { description: Published revision } }
+  /notices/{noticeId}/revisions:
+    post:
+      security: [{ devUser: [] }]
+      parameters: [{ $ref: '#/components/parameters/NoticeId' }]
+      requestBody: { $ref: '#/components/requestBodies/NoticeInput' }
+      responses: { '201': { description: New draft revision } }
+  /notices/{noticeId}/preview:
+    get:
+      security: [{ devUser: [] }]
+      parameters: [{ $ref: '#/components/parameters/NoticeId' }]
+      responses: { '200': { description: Synthetic audience preview } }
+  /feedback:
+    post:
+      security: [{ devUser: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            {
+              schema:
+                {
+                  type: object,
+                  required: [kind, message],
+                  properties:
+                    {
+                      actionId: { type: string },
+                      kind: { type: string },
+                      message: { type: string },
+                    },
+                },
+            }
+      responses: { '201': { description: Feedback recorded } }
+  parameters:
+    IdempotencyKey:
+      { name: Idempotency-Key, in: header, required: true, schema: { type: string, minLength: 1 } }
+    DocumentId: { name: documentId, in: path, required: true, schema: { type: string } }
+    ParseJobId: { name: parseJobId, in: path, required: true, schema: { type: string } }
+    ActionId: { name: actionId, in: path, required: true, schema: { type: string } }
+    TaskId: { name: taskId, in: path, required: true, schema: { type: string } }
+    NoticeId: { name: noticeId, in: path, required: true, schema: { type: string } }
+  requestBodies:
+    DocumentInput:
+      required: true
+      content:
+        application/json:
+          {
+            schema:
+              {
+                type: object,
+                required: [text],
+                properties:
+                  {
+                    title: { type: string },
+                    text: { type: string },
+                    contentType: { type: string },
+                    data_origin: { enum: [synthetic, user_provided] },
+                  },
+              },
+          }
+    Confirmation:
+      required: true
+      content:
+        {
+          application/json:
+            {
+              schema:
+                { type: object, required: [confirmed], properties: { confirmed: { const: true } } },
+            },
+        }
+    Rejection:
+      required: true
+      content:
+        {
+          application/json:
+            {
+              schema:
+                { type: object, required: [rejected], properties: { rejected: { const: true } } },
+            },
+        }
+    NoticeInput:
+      required: true
+      content:
+        {
+          application/json:
+            {
+              schema:
+                {
+                  type: object,
+                  required: [title, body],
+                  properties: { title: { type: string }, body: { type: string } },
+                },
+            },
+        }
+  responses:
+    Error:
+      description: Unified error object
+      content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+    NotFound:
+      description: Not found
+      content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }

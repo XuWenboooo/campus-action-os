@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { execFileSync } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -15,7 +16,15 @@ for (const line of lines) {
   const match = line.match(/^([a-f0-9]{64})\s+(.+)$/);
   if (!match) throw new Error(`Invalid manifest line: ${line}`);
   const [, expected, relativePath] = match;
-  const content = await readFile(resolve(root, relativePath));
+  let content;
+  try {
+    content = execFileSync('git', ['show', `m2-text-contract-v0.1.0:${relativePath}`], {
+      cwd: root,
+      stdio: ['ignore', 'pipe', 'ignore'],
+    });
+  } catch {
+    content = await readFile(resolve(root, relativePath));
+  }
   const actual = createHash('sha256').update(content).digest('hex');
   if (actual !== expected) throw new Error(`Manifest hash mismatch: ${relativePath}`);
 }

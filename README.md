@@ -4,15 +4,15 @@
 
 ## 项目定位
 
-把非结构化校园通知转换为可核验、可执行、可追踪的行动；本仓库当前承载 M1 工程与协议基础，不代表 AI 解析能力已经上线。
+把非结构化校园通知转换为可核验、可执行、可追踪的行动；本仓库当前承载可运行底座，不代表真实 AI 解析或生产上线已经完成。
 
 ## 当前阶段
 
-M2 文本接口检查点：已在 M1 `m1-foundation-v1.0.1` 基础上建立文本解析请求、文档相关性判断、解析响应、错误、确定性开发 mock、合成 fixtures、契约测试、E2E harness 和双负责人交接边界。真实 AI 解析、数据库、小程序业务闭环和正式实验仍未实现。
+可运行底座检查点：已提供冻结 v1 公共 Schema/运行时校验、Node 26 SQLite 迁移与 Repository、规则解析 HTTP 服务、Document → ParseJob → VerifiedActionObject → 用户确认 → Task 闭环、统一错误/幂等/requestId、Error Shield 和 30 条合成评测。真实 OCR/provider、微信人工验证、正式 800 条评测和生产能力仍未实现。
 
 ## 目录
 
-`apps/student-miniapp` 微信小程序宿主边界；`apps/admin-console` 发布/管理端边界；`services/api` 业务 API；`services/ai-parser` AI 解析服务边界；`packages/protocol` 共享协议/Schema 加载入口；`schemas/v1` 正式产品协议；`schemas/interfaces/v1` M2 文本接口包装协议；`tools/integration/mock-ai-parser` 开发专用确定性 mock；`benchmark` 数据集工具与开发样例；`docs/frozen` 冻结方案原文；`docs/adr` 架构决策；`tests` 工程测试。
+`apps/student-miniapp` 微信小程序宿主边界；`apps/admin-console` 发布/管理端边界；`services/api` 业务 API 与 SQLite Repository；`services/ai-parser` 规则解析服务边界；`packages/protocol` 共享协议/Schema 加载入口；`schemas/v1` 正式产品协议；`schemas/interfaces/v1` 公共接口协议；`database` 迁移；`tools/evaluation` 评测工具；`benchmark` 数据集工具与开发样例；`docs/frozen` 冻结方案原文；`tests` 工程测试。
 
 ## 设计原则
 
@@ -23,13 +23,14 @@ M2 文本接口检查点：已在 M1 `m1-foundation-v1.0.1` 基础上建立文�
 
 ## 环境要求
 
-Node.js 20+、npm 10+、Python 3.11–3.14。Windows PowerShell、macOS 和 Linux 均可使用；不要把生产密钥放入小程序或仓库。
+Node.js 22.5+、npm 10+、Python 3.11–3.14。SQLite 使用 Node 内置 `node:sqlite`；Windows PowerShell、macOS 和 Linux 均可使用；不要把生产密钥放入小程序或仓库。
 
 ## 安装和启动
 
 ```text
 npm ci
 py -3 -m pip install -r requirements-dev.txt
+npm run db:migrate
 npm run check
 npm run test
 npm run build
@@ -38,7 +39,7 @@ npm run dev:mock
 npm run dev:api
 ```
 
-API 默认监听 `http://localhost:3000`，可访问 `/health` 和 `/v1/capabilities`。启动 AI 服务边界使用 `npm run dev:ai`；它不会返回虚假的解析结果。
+Windows PowerShell 可运行 `powershell -ExecutionPolicy Bypass -File scripts/verify-start.ps1` 验证启动；持续启动使用 `scripts/start-dev.ps1`。API 默认监听 `http://localhost:3000`，AI 默认监听 `http://localhost:3001`，可访问 `/health` 和 `/v1/capabilities`。
 
 复制 `.env.example` 为 `.env.local` 仅供服务端使用。local、test、demo、production 配置和密钥管理必须分离；小程序构建上下文不读取模型密钥。
 
@@ -56,4 +57,4 @@ API 默认监听 `http://localhost:3000`，可访问 `/health` 和 `/v1/capabili
 
 ## 尚未实现
 
-真实通知采集、身份认证、数据库迁移、AI provider 接入、Prompt/规则编排、小程序页面、生产部署、正式 800 条数据、正式测试集冻结和正式实验均未实现。当前 `schemas/v1/` 是已验证的 v1 机器契约；若需改变冻结定义或核心语义，必须新建版本/proposal。
+真实通知采集、真实身份认证、图片/PDF OCR、AI provider 接入、提醒发送、小程序页面人工验证、生产部署、正式 800 条数据、正式测试集冻结和正式实验均未实现。当前 `schemas/v1/` 是已验证的冻结 v1 机器契约；若需改变冻结定义或核心语义，必须新建版本/proposal。

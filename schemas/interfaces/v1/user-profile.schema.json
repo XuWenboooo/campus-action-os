@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://campus-action-os.example/schemas/interfaces/v1/user-profile.schema.json",
+  "title": "Campus Action OS User Profile v1",
+  "type": "object",
+  "required": ["schema_version", "profile_id", "updated_at"],
+  "properties": {
+    "schema_version": { "const": "user-profile/v1" },
+    "profile_id": { "type": "string", "minLength": 1 },
+    "education_level": { "type": "string", "minLength": 1 },
+    "grade": { "type": "string", "minLength": 1 },
+    "college": { "type": "string", "minLength": 1 },
+    "major": { "type": "string", "minLength": 1 },
+    "campus": { "type": "string", "minLength": 1 },
+    "student_categories": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+    "organization_memberships": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+    "updated_at": { "type": "string", "format": "date-time" }
+  },
+  "unevaluatedProperties": false
+}

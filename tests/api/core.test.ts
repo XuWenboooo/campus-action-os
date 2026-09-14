@@ -1,0 +1,238 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import type { AddressInfo } from 'node:net';
+import { createParserServer } from '../../services/ai-parser/src/server.js';
+import { createApiServer } from '../../services/api/src/server.js';
+import { Repository } from '../../services/api/src/repository.js';
+
+async function listen(
+  server: ReturnType<typeof createParserServer> | ReturnType<typeof createApiServer>['server'],
+): Promise<string> {
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const address = server.address() as AddressInfo;
+  return `http://127.0.0.1:${address.port}`;
+}
+
+async function close(server: { close(callback: (error?: Error) => void): void }): Promise<void> {
+  await new Promise<void>((resolve, reject) =>
+    server.close((error) => (error ? reject(error) : resolve())),
+  );
+}
+
+test('API closes the document → parse job → verified action → confirmed task loop over SQLite', async () => {
+  const ai = createParserServer();
+  const aiUrl = await listen(ai);
+  const repository = new Repository(':memory:');
+  const api = createApiServer({ repository, parserUrl: aiUrl });
+  const apiUrl = await listen(api.server);
+  const headers = { 'content-type': 'application/json', 'x-dev-user-id': 'synthetic-student' };
+  const call = async (
+    method: string,
+    path: string,
+    body?: unknown,
+    extra: Record<string, string> = {},
+  ) => {
+    const result = await fetch(`${apiUrl}${path}`, {
+      method,
+      headers: { ...headers, ...extra },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+    const parsed = result.status === 204 ? null : await result.json();
+    return { result, parsed };
+  };
+
+  try {
+    const profile = await call('PATCH', '/users/me/profile', {
+      education_level: '本科生',
+      grade: '大三',
+      college: '虚构学院',
+    });
+    assert.equal(profile.result.status, 200);
+    const text =
+      '【虚构大学教务处】\n适用对象：本科生\n1. 在线系统提交申请\n2. 到现场核验材料\n截止：2099-10-03 17:00 前\n材料：学生证、成绩单\n地点：A楼101\n平台：https://example.invalid/apply';
+    const document = await call(
+      'POST',
+      '/documents',
+      { title: '合成报名通知', text, data_origin: 'synthetic' },
+      { 'idempotency-key': 'doc-loop-1' },
+    );
+    assert.equal(document.result.status, 201);
+    assert.equal(document.parsed.document.data_origin, 'synthetic');
+    const replay = await call(
+      'POST',
+      '/documents',
+      { title: '合成报名通知', text, data_origin: 'synthetic' },
+      { 'idempotency-key': 'doc-loop-1' },
+    );
+    assert.equal(replay.result.status, 201);
+    assert.equal(replay.parsed.document.document_id, document.parsed.document.document_id);
+
+    const documentId = document.parsed.document.document_id as string;
+    const parsed = await call(
+      'POST',
+      `/documents/${documentId}/parse`,
+      {},
+      { 'idempotency-key': 'parse-loop-1' },
+    );
+    assert.equal(parsed.result.status, 202);
+    assert.equal(parsed.parsed.status, 'succeeded');
+    assert.equal(parsed.parsed.result.verified_actions.length, 2);
+    assert.equal(parsed.parsed.result.action_graph.edges.length, 1);
+
+    const actions = await call('GET', `/documents/${documentId}/actions`);
+    assert.equal(actions.result.status, 200);
+    assert.equal(actions.parsed.actions.length, 2);
+    const actionId = actions.parsed.actions[0].action_id as string;
+    const missingConfirmation = await call('POST', `/actions/${actionId}/confirm`, {});
+    assert.equal(missingConfirmation.result.status, 400);
+    assert.equal(missingConfirmation.parsed.error.code, 'CONFIRMATION_REQUIRED');
+    const confirmation = await call('POST', `/actions/${actionId}/confirm`, { confirmed: true });
+    assert.equal(confirmation.result.status, 200);
+    assert.equal(confirmation.parsed.action.result_stage, 'user_confirmed');
+    const edited = await call('PATCH', `/actions/${actionId}`, { title: '用户确认后的申请任务' });
+    assert.equal(edited.result.status, 200);
+    assert.equal(edited.parsed.action.title, '用户确认后的申请任务');
+    const secondActionId = actions.parsed.actions[1].action_id as string;
+    const rejection = await call('POST', `/actions/${secondActionId}/reject`, { rejected: true });
+    assert.equal(rejection.result.status, 200);
+    assert.equal(rejection.parsed.action.verification_status, 'conflict');
+    const rejectedTask = await call(
+      'POST',
+      '/tasks',
+      { actionId: secondActionId },
+      { 'idempotency-key': 'task-rejected-1' },
+    );
+    assert.equal(rejectedTask.result.status, 409);
+    assert.equal(rejectedTask.parsed.error.code, 'ACTION_CONFIRMATION_REQUIRED');
+
+    const task = await call('POST', '/tasks', { actionId }, { 'idempotency-key': 'task-loop-1' });
+    assert.equal(task.result.status, 201);
+    assert.equal(task.parsed.task.status, 'pending');
+    const started = await call('PATCH', `/tasks/${task.parsed.task.task_id}`, {
+      status: 'in_progress',
+    });
+    assert.equal(started.result.status, 200);
+    const missingCompleteConfirmation = await call(
+      'POST',
+      `/tasks/${task.parsed.task.task_id}/complete`,
+      {},
+    );
+    assert.equal(missingCompleteConfirmation.result.status, 400);
+    assert.equal(missingCompleteConfirmation.parsed.error.code, 'CONFIRMATION_REQUIRED');
+    const completed = await call('POST', `/tasks/${task.parsed.task.task_id}/complete`, {
+      confirmed: true,
+    });
+    assert.equal(completed.result.status, 200);
+    assert.equal(completed.parsed.task.status, 'completed');
+    const actionAfterComplete = await call('GET', `/actions/${actionId}`);
+    assert.equal(actionAfterComplete.parsed.action.task_status, 'completed');
+    const illegal = await call('PATCH', `/tasks/${task.parsed.task.task_id}`, {
+      status: 'pending',
+    });
+    assert.equal(illegal.result.status, 409);
+    assert.equal(illegal.parsed.error.code, 'INVALID_STATE_TRANSITION');
+    const unknown = await call('GET', '/does-not-exist', undefined, {
+      'x-request-id': 'client-request-1',
+    });
+    assert.equal(unknown.result.status, 404);
+    assert.equal(unknown.result.headers.get('x-request-id'), 'client-request-1');
+    assert.equal(unknown.parsed.error.requestId, 'client-request-1');
+  } finally {
+    await close(api.server);
+    await close(ai);
+    repository.close();
+  }
+});
+
+test('API persists parser outage as a failed ParseJob instead of a fake success', async () => {
+  const repository = new Repository(':memory:');
+  const api = createApiServer({ repository, parserUrl: 'http://127.0.0.1:1' });
+  const url = await listen(api.server);
+  const headers = { 'content-type': 'application/json', 'x-dev-user-id': 'outage-student' };
+  try {
+    const documentResponse = await fetch(`${url}/documents`, {
+      method: 'POST',
+      headers: { ...headers, 'idempotency-key': 'outage-doc-1' },
+      body: JSON.stringify({ text: '适用对象：本科生\n1. 提交材料', data_origin: 'synthetic' }),
+    });
+    const documentBody = await documentResponse.json();
+    const parseResponse = await fetch(
+      `${url}/documents/${documentBody.document.document_id}/parse`,
+      { method: 'POST', headers: { ...headers, 'idempotency-key': 'outage-parse-1' }, body: '{}' },
+    );
+    const parseBody = await parseResponse.json();
+    assert.equal(parseResponse.status, 202);
+    assert.equal(parseBody.status, 'failed');
+    assert.equal(parseBody.error.code, 'PARSER_NOT_CONFIGURED');
+  } finally {
+    await close(api.server);
+    repository.close();
+  }
+});
+
+test('production mode rejects dev login', async () => {
+  const repository = new Repository(':memory:');
+  const api = createApiServer({ repository, environment: 'production' });
+  const url = await listen(api.server);
+  try {
+    const result = await fetch(`${url}/auth/dev-login`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: '{}',
+    });
+    const body = await result.json();
+    assert.equal(result.status, 403);
+    assert.equal(body.error.code, 'DEV_LOGIN_DISABLED');
+  } finally {
+    await close(api.server);
+    repository.close();
+  }
+});
+
+test('publisher notice endpoints retain revision history and all side effects require confirmation', async () => {
+  const repository = new Repository(':memory:');
+  const api = createApiServer({ repository });
+  const url = await listen(api.server);
+  const headers = { 'content-type': 'application/json', 'x-dev-user-id': 'synthetic-publisher' };
+  const call = async (method: string, path: string, body?: unknown) => {
+    const result = await fetch(`${url}${path}`, {
+      method,
+      headers,
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+    return { result, body: result.status === 204 ? null : await result.json() };
+  };
+  try {
+    const created = await call('POST', '/notices', {
+      title: '合成发布通知',
+      body: '请在 2099-10-01 前完成登记',
+    });
+    assert.equal(created.result.status, 201);
+    const noticeId = created.body.notice.notice_id as string;
+    const noConfirmation = await call('POST', `/notices/${noticeId}/publish`, {});
+    assert.equal(noConfirmation.result.status, 400);
+    assert.equal(noConfirmation.body.error.code, 'CONFIRMATION_REQUIRED');
+    const published = await call('POST', `/notices/${noticeId}/publish`, { confirmed: true });
+    assert.equal(published.result.status, 200);
+    assert.equal(published.body.revision.status, 'published');
+    const revised = await call('POST', `/notices/${noticeId}/revisions`, {
+      title: '延期后的合成通知',
+      body: '截止时间改为 2099-10-08',
+    });
+    assert.equal(revised.result.status, 201);
+    assert.equal(revised.body.revision.revision_number, 2);
+    const read = await call('GET', `/notices/${noticeId}`);
+    assert.equal(read.body.notice.revisions.length, 2);
+    const preview = await call('GET', `/notices/${noticeId}/preview`);
+    assert.equal(preview.result.status, 200);
+    assert.equal(preview.body.revision.revision_id, revised.body.revision.revision_id);
+    const feedback = await call('POST', '/feedback', {
+      kind: 'notice_review',
+      message: 'synthetic feedback',
+    });
+    assert.equal(feedback.result.status, 201);
+  } finally {
+    await close(api.server);
+    repository.close();
+  }
+});

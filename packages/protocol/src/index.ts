@@ -217,6 +217,69 @@ export type UserProfile = {
   organization_memberships?: string[];
 };
 
+export type PublicUserProfile = UserProfile & {
+  schema_version: 'user-profile/v1';
+  profile_id: string;
+  updated_at: string;
+};
+
+export type DocumentContentType = 'text/plain' | 'image/png' | 'application/pdf' | 'text/html';
+export type DataOrigin = 'synthetic' | 'user_provided';
+export type Document = {
+  schema_version: 'document/v1';
+  document_id: string;
+  owner_user_id: string;
+  title: string;
+  content_type: DocumentContentType;
+  text: string;
+  content_sha256: string;
+  data_origin: DataOrigin;
+  created_at: string;
+};
+
+export type ParseJobStatus =
+  'queued' | 'running' | 'succeeded' | 'partial' | 'needs_confirmation' | 'failed';
+export type ParseJob = {
+  schema_version: 'parse-job/v1';
+  parse_job_id: string;
+  document_id: string;
+  user_id: string;
+  request_id: string;
+  idempotency_key: string;
+  status: ParseJobStatus;
+  result?: TextParseResponse | null;
+  error?: ApiError['error'] | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type Task = {
+  schema_version: 'task/v1';
+  task_id: string;
+  user_id: string;
+  action_id: string;
+  document_id: string;
+  title: string;
+  status: TaskStatus;
+  due_at: string | null;
+  created_at: string;
+  updated_at: string;
+  completed_at: string | null;
+};
+
+export type NoticeRevisionStatus = 'draft' | 'published' | 'postponed' | 'revoked';
+export type NotificationRevision = {
+  schema_version: 'notification-revision/v1';
+  notice_id: string;
+  revision_id: string;
+  revision_number: number;
+  status: NoticeRevisionStatus;
+  title: string;
+  body: string;
+  created_at: string;
+  published_at: string | null;
+};
+
 export type TextParseExecutionContext = {
   environment: 'local' | 'test' | 'demo' | 'production';
   deadline_ms: number;
@@ -296,7 +359,13 @@ export type ProtocolSchemaName =
   | 'campus-action-bench'
   | 'text-parse-request'
   | 'document-assessment'
-  | 'text-parse-response';
+  | 'text-parse-response'
+  | 'user-profile'
+  | 'document'
+  | 'parse-job'
+  | 'task'
+  | 'notification-revision'
+  | 'error';
 export type ValidationError = {
   path: string;
   keyword: string;
@@ -311,6 +380,12 @@ const schemaFiles: Record<ProtocolSchemaName, string> = {
   'text-parse-request': 'schemas/interfaces/v1/text-parse-request.schema.json',
   'document-assessment': 'schemas/interfaces/v1/document-assessment.schema.json',
   'text-parse-response': 'schemas/interfaces/v1/text-parse-response.schema.json',
+  'user-profile': 'schemas/interfaces/v1/user-profile.schema.json',
+  document: 'schemas/interfaces/v1/document.schema.json',
+  'parse-job': 'schemas/interfaces/v1/parse-job.schema.json',
+  task: 'schemas/interfaces/v1/task.schema.json',
+  'notification-revision': 'schemas/interfaces/v1/notification-revision.schema.json',
+  error: 'schemas/interfaces/v1/error.schema.json',
 };
 const sourceRoot = resolve(fileURLToPath(new URL('.', import.meta.url)), '../../..');
 
@@ -340,6 +415,13 @@ function makeValidator(name: ProtocolSchemaName, rootDir: string): ValidateFunct
     ajv.addSchema(loadSchema('verified-action-object', rootDir));
     ajv.addSchema(loadSchema('action-graph', rootDir));
     ajv.addSchema(loadSchema('document-assessment', rootDir));
+  }
+  if (name === 'parse-job') {
+    ajv.addSchema(loadSchema('text-parse-response', rootDir));
+    ajv.addSchema(loadSchema('verified-action-object', rootDir));
+    ajv.addSchema(loadSchema('action-graph', rootDir));
+    ajv.addSchema(loadSchema('document-assessment', rootDir));
+    ajv.addSchema(loadSchema('error', rootDir));
   }
   return ajv.compile(loadSchema(name, rootDir));
 }
@@ -606,7 +688,7 @@ export function validateTextParseResponse(
       response.document_assessment.user_relevance === 'uncertain' ||
       response.document_assessment.verification_status !== 'passed' ||
       response.warnings.some((warning) =>
-        /conflict|confirm|uncertain/i.test(warning.code + warning.message),
+        /conflict|confirm|uncertain|unknown|deadline/i.test(warning.code + warning.message),
       );
     if (!hasBasis) {
       errors.push({
@@ -675,6 +757,50 @@ export function validateTextParseExchange(
   return errors.length
     ? { ok: false, errors }
     : { ok: true, value: { request: requestResult.value, response: responseResult.value } };
+}
+
+export function validateUserProfile(
+  value: unknown,
+  rootDir = sourceRoot,
+): ValidationResult<PublicUserProfile> {
+  return validate<PublicUserProfile>('user-profile', value, rootDir);
+}
+
+export function validateDocument(value: unknown, rootDir = sourceRoot): ValidationResult<Document> {
+  const result = validate<Document>('document', value, rootDir);
+  if (!result.ok) return result;
+  const actualHash = createHash('sha256').update(result.value.text, 'utf8').digest('hex');
+  return actualHash === result.value.content_sha256
+    ? result
+    : {
+        ok: false,
+        errors: [
+          {
+            path: '/content_sha256',
+            keyword: 'content_sha256',
+            message: 'content_sha256 does not match document.text',
+          },
+        ],
+      };
+}
+
+export function validateParseJob(value: unknown, rootDir = sourceRoot): ValidationResult<ParseJob> {
+  return validate<ParseJob>('parse-job', value, rootDir);
+}
+
+export function validateTask(value: unknown, rootDir = sourceRoot): ValidationResult<Task> {
+  return validate<Task>('task', value, rootDir);
+}
+
+export function validateNotificationRevision(
+  value: unknown,
+  rootDir = sourceRoot,
+): ValidationResult<NotificationRevision> {
+  return validate<NotificationRevision>('notification-revision', value, rootDir);
+}
+
+export function validateError(value: unknown, rootDir = sourceRoot): ValidationResult<ApiError> {
+  return validate<ApiError>('error', value, rootDir);
 }
 
 export function isRetryableParseError(code: ParseErrorCode): boolean {

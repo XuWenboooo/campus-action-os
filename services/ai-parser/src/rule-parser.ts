@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto';
 import {
   validateTextParseRequest,
-  validateTextParseResponse,
+  validateTextParseResponseAgainstText,
   type ActionGraph,
   type ActionStep,
   type Claim,
@@ -395,7 +395,7 @@ export function parseText(request: TextParseRequest): TextParseResponse | Parser
       ? {}
       : { provenance: { development_only: true, synthetic: true, not_model_output: true } }),
   };
-  const validResponse = validateTextParseResponse(response);
+  const validResponse = validateTextParseResponseAgainstText(response, source);
   if (!validResponse.ok)
     return {
       code: 'INVALID_REQUEST',

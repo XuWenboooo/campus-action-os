@@ -5,6 +5,7 @@ import {
   loadSchema,
   protocolVersion,
   validateActionGraph,
+  validateTextParseResponseAgainstText,
   validateTextParseResponse,
   validateVerifiedActionObject,
 } from '@campus-action-os/protocol';
@@ -206,4 +207,33 @@ test('runtime response validator keeps verified actions and graph actions consis
   const validation = validateTextParseResponse(response);
   assert.equal(validation.ok, false);
   if (!validation.ok) assert.ok(validation.errors.some((error) => error.keyword === 'consistency'));
+  const alignedResponse = {
+    ...response,
+    action_graph: {
+      ...response.action_graph,
+      nodes: [{ node_id: 'node-1', node_type: 'action' as const, action_id: 'a-test' }],
+    },
+  };
+  assert.equal(
+    validateTextParseResponseAgainstText(alignedResponse, '学生提交材料，截止 10月1日前').ok,
+    true,
+  );
+  const misalignedResponse = {
+    ...alignedResponse,
+    verified_actions: [
+      {
+        ...validAction,
+        evidence: validAction.evidence.map((item, index) =>
+          index === 0 ? { ...item, source_text: '原文不存在的证据' } : item,
+        ),
+      },
+    ],
+  };
+  const alignment = validateTextParseResponseAgainstText(
+    misalignedResponse,
+    '学生提交材料，截止 10月1日前',
+  );
+  assert.equal(alignment.ok, false);
+  if (!alignment.ok)
+    assert.ok(alignment.errors.some((error) => error.keyword === 'evidence_alignment'));
 });

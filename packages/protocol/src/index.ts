@@ -840,6 +840,41 @@ export function validateTextParseResponse(
   return errors.length ? { ok: false, errors } : result;
 }
 
+function normalizedEvidenceText(value: string): string {
+  return value.replace(/\s+/g, ' ').trim();
+}
+
+export function validateTextParseResponseAgainstText(
+  value: unknown,
+  sourceText: string,
+  rootDir = sourceRoot,
+): ValidationResult<TextParseResponse> {
+  const result = validateTextParseResponse(value, rootDir);
+  if (!result.ok) return result;
+  const source = normalizedEvidenceText(sourceText);
+  const errors: ValidationError[] = [];
+  for (const [index, evidence] of result.value.document_assessment.evidence.entries()) {
+    const evidenceText = normalizedEvidenceText(evidence.source_text);
+    if (!evidenceText || !source.includes(evidenceText))
+      errors.push({
+        path: `/document_assessment/evidence/${index}/source_text`,
+        keyword: 'evidence_alignment',
+        message: 'assessment evidence source_text must occur in the normalized document text',
+      });
+  }
+  for (const [actionIndex, action] of result.value.verified_actions.entries())
+    for (const [evidenceIndex, evidence] of action.evidence.entries()) {
+      const evidenceText = normalizedEvidenceText(evidence.source_text);
+      if (!evidenceText || !source.includes(evidenceText))
+        errors.push({
+          path: `/verified_actions/${actionIndex}/evidence/${evidenceIndex}/source_text`,
+          keyword: 'evidence_alignment',
+          message: 'action evidence source_text must occur in the normalized document text',
+        });
+    }
+  return errors.length ? { ok: false, errors } : result;
+}
+
 export function validateTextParseExchange(
   request: unknown,
   response: unknown,

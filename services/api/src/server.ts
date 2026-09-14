@@ -3,7 +3,7 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import {
   createApiError,
   protocolVersion,
-  validateTextParseResponse,
+  validateTextParseResponseAgainstText,
   type ApiError,
   type Document,
   type NotificationRevision,
@@ -254,7 +254,7 @@ async function parseDocument(
     repository.failParseJob(userId, parseJobId, result.body, requestId);
     return;
   }
-  const valid = validateTextParseResponse(result.body);
+  const valid = validateTextParseResponseAgainstText(result.body, normalized.text);
   if (!valid.ok) {
     repository.failParseJob(
       userId,

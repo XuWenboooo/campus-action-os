@@ -35,5 +35,6 @@
 - 补齐解析请求幂等一致性：新增 SQLite 迁移保存 ParseJob 的内部 `request_hash`，同一用户/文档/key 携带不同解析请求体时统一返回 `IDEMPOTENCY_CONFLICT`，并加入 API 回归测试。
 - 为开发登录角色 provision 增加 scoped 幂等：同一 key 重放不重复写角色审计，修改请求体统一返回 `IDEMPOTENCY_CONFLICT`，并覆盖 API 回归测试。
 - 补齐 Action 归一化投影：新增 `action_steps`、`action_dependencies`、`deadlines`、`materials` 迁移，并在解析落库与 Action 编辑事务中同步替换；API 验证这些投影真实写入 SQLite。
+- 加强 Evidence 对齐：共享协议新增“证据原文必须出现在标准化文档文本中”的运行时校验，规则 Parser 与 API 均执行，结构合法但伪造原文的响应进入 `PARSER_RESPONSE_INVALID`，并加入协议/API 失败测试。
 
 仍为 `NOT_READY`：真实 OCR/provider、正式 800 条冻结评测、微信开发者工具人工验证、真实认证/提醒和生产部署均缺失；本地测试不能替代这些证据。

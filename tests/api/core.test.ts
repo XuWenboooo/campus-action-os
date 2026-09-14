@@ -5,6 +5,8 @@ import type { AddressInfo } from 'node:net';
 import { createParserServer } from '../../services/ai-parser/src/server.js';
 import { createApiServer } from '../../services/api/src/server.js';
 import { Repository } from '../../services/api/src/repository.js';
+import { parseText } from '../../services/ai-parser/src/rule-parser.js';
+import type { TextParseRequest } from '@campus-action-os/protocol';
 
 async function listen(server: Server): Promise<string> {
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
@@ -428,7 +430,7 @@ test('API persists a protocol-level parser rejection with both result and error'
           evidence: [
             {
               evidence_id: 'rejected-assessment-evidence',
-              source_text: '合成通知',
+              source_text: '适用对象：本科生',
               field_name: 'other',
             },
           ],
@@ -495,6 +497,70 @@ test('API persists a protocol-level parser rejection with both result and error'
   } finally {
     await close(api.server);
     await close(rejectedParser);
+    repository.close();
+  }
+});
+
+test('API rejects structurally valid parser evidence that is absent from source text', async () => {
+  const tamperedParser = createServer(async (request, response) => {
+    let raw = '';
+    for await (const chunk of request) raw += String(chunk);
+    const input = JSON.parse(raw) as TextParseRequest;
+    const parsed = parseText(input);
+    if ('code' in parsed) {
+      response.writeHead(400, { 'content-type': 'application/json' }).end(JSON.stringify(parsed));
+      return;
+    }
+    const action = parsed.verified_actions[0];
+    const tampered = {
+      ...parsed,
+      verified_actions: [
+        {
+          ...action,
+          evidence: action.evidence.map((item, index) =>
+            index === 0 ? { ...item, source_text: '原文不存在的证据' } : item,
+          ),
+        },
+        ...parsed.verified_actions.slice(1),
+      ],
+    };
+    response.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify(tampered));
+  });
+  const parserUrl = await listen(tamperedParser);
+  const repository = new Repository(':memory:');
+  const api = createApiServer({ repository, parserUrl });
+  const url = await listen(api.server);
+  const headers = { 'content-type': 'application/json', 'x-dev-user-id': 'alignment-student' };
+  try {
+    const documentResponse = await fetch(`${url}/documents`, {
+      method: 'POST',
+      headers: { ...headers, 'idempotency-key': 'alignment-document-1' },
+      body: JSON.stringify({
+        title: '证据对齐通知',
+        text: '适用对象：本科生\n1. 提交申请\n截止：2099-10-03 17:00 前',
+        data_origin: 'synthetic',
+      }),
+    });
+    const documentBody = await documentResponse.json();
+    const parseResponse = await fetch(
+      `${url}/documents/${documentBody.document.document_id}/parse`,
+      {
+        method: 'POST',
+        headers: { ...headers, 'idempotency-key': 'alignment-parse-1' },
+        body: '{}',
+      },
+    );
+    const parseBody = await parseResponse.json();
+    assert.equal(parseResponse.status, 202);
+    assert.equal(parseBody.status, 'failed');
+    assert.equal(parseBody.error.code, 'PARSER_RESPONSE_INVALID');
+    assert.equal(
+      repository.listActions('alignment-student', documentBody.document.document_id).length,
+      0,
+    );
+  } finally {
+    await close(api.server);
+    await close(tamperedParser);
     repository.close();
   }
 });

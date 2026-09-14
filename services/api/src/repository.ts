@@ -154,6 +154,77 @@ function taskFromRow(row: Row): Task {
   return result.value;
 }
 
+function revisionFromRow(row: Row): NotificationRevision {
+  const revision: NotificationRevision = {
+    schema_version: 'notification-revision/v1',
+    notice_id: text(row.notice_id),
+    revision_id: text(row.revision_id),
+    revision_number: Number(row.revision_number),
+    status: row.status as NotificationRevision['status'],
+    title: text(row.title),
+    body: text(row.body),
+    created_at: text(row.created_at),
+    published_at: row.published_at === null ? null : text(row.published_at),
+  };
+  const valid = validateNotificationRevision(revision);
+  if (!valid.ok)
+    throw new RepositoryError(
+      'DATA_CORRUPTION',
+      500,
+      'Stored notification revision failed schema validation',
+    );
+  return valid.value;
+}
+
+export type NoticeTaskSyncChangeType = 'replaced' | 'postponed' | 'revoked';
+export type NoticeTaskSyncStatus = 'pending_review' | 'accepted' | 'rejected';
+export type NoticeTaskLink = {
+  link_id: string;
+  notice_id: string;
+  task_id: string;
+  revision_id: string;
+  status: 'active' | 'unlinked';
+  linked_at: string;
+};
+export type NoticeTaskSyncEvent = {
+  sync_event_id: string;
+  link_id: string;
+  from_revision_id: string;
+  to_revision_id: string;
+  change_type: NoticeTaskSyncChangeType;
+  status: NoticeTaskSyncStatus;
+  reason: string;
+  request_id: string;
+  created_at: string;
+  resolved_at: string | null;
+};
+
+function noticeTaskLinkFromRow(row: Row): NoticeTaskLink {
+  return {
+    link_id: text(row.link_id),
+    notice_id: text(row.notice_id),
+    task_id: text(row.task_id),
+    revision_id: text(row.revision_id),
+    status: row.status as NoticeTaskLink['status'],
+    linked_at: text(row.linked_at),
+  };
+}
+
+function noticeTaskSyncEventFromRow(row: Row): NoticeTaskSyncEvent {
+  return {
+    sync_event_id: text(row.sync_event_id),
+    link_id: text(row.link_id),
+    from_revision_id: text(row.from_revision_id),
+    to_revision_id: text(row.to_revision_id),
+    change_type: row.change_type as NoticeTaskSyncChangeType,
+    status: row.status as NoticeTaskSyncStatus,
+    reason: text(row.reason),
+    request_id: text(row.request_id),
+    created_at: text(row.created_at),
+    resolved_at: row.resolved_at === null ? null : text(row.resolved_at),
+  };
+}
+
 export type CreateDocumentInput = {
   documentId?: string;
   ownerUserId: string;
@@ -161,6 +232,11 @@ export type CreateDocumentInput = {
   contentType: Document['content_type'];
   text: string;
   dataOrigin?: Document['data_origin'];
+};
+
+export type NoticeRevisionInput = {
+  status?: NotificationRevision['status'];
+  confirmed?: boolean;
 };
 
 export class Repository {
@@ -881,17 +957,7 @@ export class Repository {
           'SELECT * FROM notification_revisions WHERE notice_id = ? ORDER BY revision_number',
         )
         .all(noticeId) as Row[]
-    ).map((row) => ({
-      schema_version: 'notification-revision/v1' as const,
-      notice_id: text(row.notice_id),
-      revision_id: text(row.revision_id),
-      revision_number: Number(row.revision_number),
-      status: row.status as NotificationRevision['status'],
-      title: text(row.title),
-      body: text(row.body),
-      created_at: text(row.created_at),
-      published_at: row.published_at === null ? null : text(row.published_at),
-    }));
+    ).map(revisionFromRow);
     return {
       notice_id: noticeId,
       publisher_user_id: userId,
@@ -916,16 +982,84 @@ export class Repository {
     if (!notice) throw new RepositoryError('NOTICE_NOT_FOUND', 404, 'Notice not found');
     const revision = notice.revisions.at(-1);
     if (!revision) throw new RepositoryError('NOTICE_NOT_FOUND', 404, 'Notice revision not found');
+    if (revision.status !== 'draft')
+      throw new RepositoryError(
+        'NOTICE_REVISION_NOT_DRAFT',
+        409,
+        'Only a draft notice revision can be published',
+      );
     const publishedAt = now();
-    this.db
-      .prepare(
-        'UPDATE notification_revisions SET status = ?, published_at = ? WHERE revision_id = ?',
-      )
-      .run('published', publishedAt, revision.revision_id);
-    this.recordAudit(requestId, userId, 'notice.published', 'notice', noticeId, {
-      revision_id: revision.revision_id,
-    });
+    this.db.exec('BEGIN');
+    try {
+      this.db
+        .prepare(
+          'UPDATE notification_revisions SET status = ?, published_at = ? WHERE revision_id = ?',
+        )
+        .run('published', publishedAt, revision.revision_id);
+      const published = { ...revision, status: 'published' as const, published_at: publishedAt };
+      this.recordAudit(requestId, userId, 'notice.published', 'notice', noticeId, {
+        revision_id: revision.revision_id,
+      });
+      this.syncNoticeTasks(noticeId, published, requestId);
+      this.db.exec('COMMIT');
+    } catch (error) {
+      this.db.exec('ROLLBACK');
+      throw error;
+    }
     return { ...revision, status: 'published', published_at: publishedAt };
+  }
+
+  private syncNoticeTasks(
+    noticeId: string,
+    revision: NotificationRevision,
+    requestId: string,
+  ): void {
+    if (revision.status === 'draft') return;
+    const changeType: NoticeTaskSyncChangeType =
+      revision.status === 'postponed'
+        ? 'postponed'
+        : revision.status === 'revoked'
+          ? 'revoked'
+          : 'replaced';
+    const reason =
+      revision.status === 'postponed'
+        ? 'Published notice revision postpones an existing task-linked notice'
+        : revision.status === 'revoked'
+          ? 'Published notice revision revokes an existing task-linked notice'
+          : 'Published notice revision replaces an existing task-linked notice';
+    const links = this.db
+      .prepare(
+        'SELECT link_id, notice_id, task_id, revision_id, status, linked_at FROM notice_task_links WHERE notice_id = ? AND status = ? AND revision_id <> ?',
+      )
+      .all(noticeId, 'active', revision.revision_id) as Row[];
+    for (const linkRow of links) {
+      const link = noticeTaskLinkFromRow(linkRow);
+      this.db
+        .prepare(
+          'INSERT INTO notice_task_sync_events (sync_event_id, link_id, from_revision_id, to_revision_id, change_type, status, reason, request_id, created_at, resolved_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        )
+        .run(
+          randomUUID(),
+          link.link_id,
+          link.revision_id,
+          revision.revision_id,
+          changeType,
+          'pending_review',
+          reason,
+          requestId,
+          now(),
+          null,
+        );
+      this.db
+        .prepare('UPDATE notice_task_links SET revision_id = ? WHERE link_id = ?')
+        .run(revision.revision_id, link.link_id);
+      this.recordAudit(requestId, null, 'notice.task_sync_pending', 'task', link.task_id, {
+        notice_id: noticeId,
+        from_revision_id: link.revision_id,
+        to_revision_id: revision.revision_id,
+        change_type: changeType,
+      });
+    }
   }
 
   createRevision(
@@ -934,20 +1068,35 @@ export class Repository {
     title: string,
     body: string,
     requestId: string,
+    options: NoticeRevisionInput = {},
   ): NotificationRevision {
     const notice = this.getNotice(userId, noticeId);
     if (!notice) throw new RepositoryError('NOTICE_NOT_FOUND', 404, 'Notice not found');
+    const status = options.status ?? 'draft';
+    if (status === 'published')
+      throw new RepositoryError(
+        'INVALID_NOTICE',
+        400,
+        'Use the publish endpoint for a published revision',
+      );
+    if (status !== 'draft' && options.confirmed !== true)
+      throw new RepositoryError(
+        'CONFIRMATION_REQUIRED',
+        400,
+        'Postponing or revoking a notice requires explicit confirmation',
+      );
     const createdAt = now();
+    const publishedAt = status === 'draft' ? null : createdAt;
     const revision: NotificationRevision = {
       schema_version: 'notification-revision/v1',
       notice_id: noticeId,
       revision_id: randomUUID(),
       revision_number: notice.revisions.length + 1,
-      status: 'draft',
+      status,
       title: title.trim(),
       body,
       created_at: createdAt,
-      published_at: null,
+      published_at: publishedAt,
     };
     const valid = validateNotificationRevision(revision);
     if (!valid.ok)
@@ -970,20 +1119,225 @@ export class Repository {
           revision.title,
           revision.body,
           createdAt,
-          null,
+          publishedAt,
         );
       this.db
         .prepare('UPDATE notices SET current_revision_id = ?, title = ? WHERE notice_id = ?')
         .run(revision.revision_id, revision.title, noticeId);
       this.recordAudit(requestId, userId, 'notice.revised', 'notice', noticeId, {
         revision_id: revision.revision_id,
+        status,
       });
+      this.syncNoticeTasks(noticeId, revision, requestId);
       this.db.exec('COMMIT');
     } catch (error) {
       this.db.exec('ROLLBACK');
       throw error;
     }
     return revision;
+  }
+
+  linkTaskToNotice(
+    userId: string,
+    taskId: string,
+    noticeId: string,
+    requestId: string,
+    confirmed: boolean,
+  ): NoticeTaskLink {
+    if (!confirmed)
+      throw new RepositoryError(
+        'CONFIRMATION_REQUIRED',
+        400,
+        'Linking a notice to a task requires explicit confirmation',
+      );
+    const task = this.getTask(userId, taskId);
+    if (!task) throw new RepositoryError('TASK_NOT_FOUND', 404, 'Task not found');
+    const notice = this.db
+      .prepare('SELECT notice_id FROM notices WHERE notice_id = ?')
+      .get(noticeId) as Row | undefined;
+    if (!notice) throw new RepositoryError('NOTICE_NOT_FOUND', 404, 'Notice not found');
+    const revision = this.db
+      .prepare(
+        'SELECT * FROM notification_revisions WHERE notice_id = ? AND status = ? ORDER BY revision_number DESC LIMIT 1',
+      )
+      .get(noticeId, 'published') as Row | undefined;
+    if (!revision)
+      throw new RepositoryError(
+        'NOTICE_NOT_PUBLISHED',
+        409,
+        'A task can only link to a published notice revision',
+      );
+    const existing = this.db
+      .prepare('SELECT * FROM notice_task_links WHERE notice_id = ? AND task_id = ?')
+      .get(noticeId, taskId) as Row | undefined;
+    if (existing)
+      throw new RepositoryError('NOTICE_TASK_LINK_EXISTS', 409, 'Task is already linked to notice');
+    const link: NoticeTaskLink = {
+      link_id: randomUUID(),
+      notice_id: noticeId,
+      task_id: taskId,
+      revision_id: text(revision.revision_id),
+      status: 'active',
+      linked_at: now(),
+    };
+    this.db
+      .prepare(
+        'INSERT INTO notice_task_links (link_id, notice_id, task_id, revision_id, status, linked_at) VALUES (?, ?, ?, ?, ?, ?)',
+      )
+      .run(
+        link.link_id,
+        link.notice_id,
+        link.task_id,
+        link.revision_id,
+        link.status,
+        link.linked_at,
+      );
+    this.recordAudit(requestId, userId, 'task.notice_linked', 'task', taskId, {
+      notice_id: noticeId,
+      revision_id: link.revision_id,
+    });
+    return link;
+  }
+
+  listNoticeTaskSync(
+    userId: string,
+    taskId: string,
+  ): Array<NoticeTaskLink & { events: NoticeTaskSyncEvent[] }> {
+    const task = this.getTask(userId, taskId);
+    if (!task) throw new RepositoryError('TASK_NOT_FOUND', 404, 'Task not found');
+    const links = this.db
+      .prepare(
+        'SELECT link_id, notice_id, task_id, revision_id, status, linked_at FROM notice_task_links WHERE task_id = ? ORDER BY linked_at',
+      )
+      .all(taskId) as Row[];
+    return links.map((row) => {
+      const link = noticeTaskLinkFromRow(row);
+      const events = this.db
+        .prepare('SELECT * FROM notice_task_sync_events WHERE link_id = ? ORDER BY created_at')
+        .all(link.link_id) as Row[];
+      return { ...link, events: events.map(noticeTaskSyncEventFromRow) };
+    });
+  }
+
+  resolveNoticeTaskSync(
+    userId: string,
+    taskId: string,
+    syncEventId: string,
+    decision: 'accept' | 'reject',
+    confirmed: boolean,
+    requestId: string,
+  ): { sync: NoticeTaskSyncEvent; task: Task } {
+    if (!confirmed)
+      throw new RepositoryError(
+        'CONFIRMATION_REQUIRED',
+        400,
+        'Resolving a notice task change requires explicit confirmation',
+      );
+    const task = this.getTask(userId, taskId);
+    if (!task) throw new RepositoryError('TASK_NOT_FOUND', 404, 'Task not found');
+    const eventRow = this.db
+      .prepare(
+        'SELECT e.* FROM notice_task_sync_events e JOIN notice_task_links l ON l.link_id = e.link_id WHERE e.sync_event_id = ? AND l.task_id = ? AND l.status = ?',
+      )
+      .get(syncEventId, taskId, 'active') as Row | undefined;
+    if (!eventRow)
+      throw new RepositoryError('SYNC_EVENT_NOT_FOUND', 404, 'Notice task sync event not found');
+    if (eventRow.status !== 'pending_review')
+      throw new RepositoryError(
+        'SYNC_EVENT_NOT_PENDING',
+        409,
+        'Notice task sync event is already resolved',
+      );
+    const resolvedStatus: NoticeTaskSyncStatus = decision === 'accept' ? 'accepted' : 'rejected';
+    const resolvedAt = now();
+    let changedTask = task;
+    this.db.exec('BEGIN');
+    try {
+      if (
+        decision === 'accept' &&
+        eventRow.change_type === 'revoked' &&
+        (task.status === 'pending' || task.status === 'in_progress')
+      ) {
+        const cancelled: Task = {
+          ...task,
+          status: 'cancelled',
+          completed_at: null,
+          updated_at: resolvedAt,
+        };
+        const valid = validateTask(cancelled);
+        if (!valid.ok)
+          throw new RepositoryError(
+            'INVALID_TASK',
+            400,
+            valid.errors[0]?.message ?? 'Invalid task',
+          );
+        this.db
+          .prepare(
+            'UPDATE tasks SET status = ?, completed_at = ?, updated_at = ? WHERE task_id = ? AND user_id = ?',
+          )
+          .run(cancelled.status, null, cancelled.updated_at, taskId, userId);
+        const action = this.getAction(userId, task.action_id);
+        if (action && action.task_status !== 'cancelled') {
+          const changedAction: VerifiedActionObject = {
+            ...action,
+            task_status: 'cancelled',
+            change_history: [
+              ...action.change_history,
+              {
+                change_id: randomUUID(),
+                occurred_at: resolvedAt,
+                actor: 'system',
+                change_type: 'revoked',
+                reason: 'User accepted a linked notice revocation',
+              },
+            ],
+          };
+          this.db
+            .prepare(
+              'UPDATE verified_actions SET payload_json = ?, task_status = ?, updated_at = ? WHERE action_id = ? AND user_id = ?',
+            )
+            .run(
+              json(changedAction),
+              changedAction.task_status,
+              resolvedAt,
+              action.action_id,
+              userId,
+            );
+          insertActionChanges(this.db, changedAction);
+        }
+        this.db
+          .prepare(
+            'INSERT INTO task_events (event_id, task_id, from_status, to_status, reason, request_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+          )
+          .run(
+            randomUUID(),
+            taskId,
+            task.status,
+            'cancelled',
+            'User accepted a linked notice revocation',
+            requestId,
+            resolvedAt,
+          );
+        changedTask = cancelled;
+      }
+      this.db
+        .prepare(
+          'UPDATE notice_task_sync_events SET status = ?, resolved_at = ? WHERE sync_event_id = ?',
+        )
+        .run(resolvedStatus, resolvedAt, syncEventId);
+      this.recordAudit(requestId, userId, `notice.task_sync_${decision}`, 'task', taskId, {
+        sync_event_id: syncEventId,
+        change_type: eventRow.change_type,
+      });
+      this.db.exec('COMMIT');
+    } catch (error) {
+      this.db.exec('ROLLBACK');
+      throw error;
+    }
+    const resolved = this.db
+      .prepare('SELECT * FROM notice_task_sync_events WHERE sync_event_id = ?')
+      .get(syncEventId) as Row;
+    return { sync: noticeTaskSyncEventFromRow(resolved), task: changedTask };
   }
 
   addFeedback(

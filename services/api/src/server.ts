@@ -6,6 +6,7 @@ import {
   validateTextParseResponse,
   type ApiError,
   type Document,
+  type NotificationRevision,
   type Task,
   type UserProfile,
   type VerifiedActionObject,
@@ -525,8 +526,84 @@ async function handle(
     send(response, 201, output, requestId);
     return;
   }
+  if (
+    segments[0] === 'tasks' &&
+    segments[1] &&
+    segments[2] === 'notices' &&
+    request.method === 'POST'
+  ) {
+    const key = idempotencyKey(request, body);
+    const hash = requestHash(body);
+    const previous = repository.getIdempotency(userId, path, key, hash);
+    if (previous === 'conflict')
+      throw new RepositoryError(
+        'IDEMPOTENCY_CONFLICT',
+        409,
+        'Idempotency key was reused with a different request',
+      );
+    if (previous) {
+      send(response, previous.status, previous.body, requestId);
+      return;
+    }
+    const output = {
+      link: repository.linkTaskToNotice(
+        userId,
+        segments[1],
+        stringField(body, 'noticeId')!,
+        requestId,
+        body.confirmed === true,
+      ),
+    };
+    repository.saveIdempotency(userId, path, key, hash, 201, output);
+    send(response, 201, output, requestId);
+    return;
+  }
   if (request.method === 'GET' && path === '/tasks') {
     send(response, 200, { tasks: repository.listTasks(userId) }, requestId);
+    return;
+  }
+  if (
+    segments[0] === 'tasks' &&
+    segments[1] &&
+    segments[2] === 'notice-sync' &&
+    request.method === 'GET'
+  ) {
+    send(response, 200, { sync: repository.listNoticeTaskSync(userId, segments[1]) }, requestId);
+    return;
+  }
+  if (
+    segments[0] === 'tasks' &&
+    segments[1] &&
+    segments[2] === 'notice-sync' &&
+    segments[3] &&
+    segments[4] === 'resolve' &&
+    request.method === 'POST'
+  ) {
+    const key = idempotencyKey(request, body);
+    const hash = requestHash(body);
+    const previous = repository.getIdempotency(userId, path, key, hash);
+    if (previous === 'conflict')
+      throw new RepositoryError(
+        'IDEMPOTENCY_CONFLICT',
+        409,
+        'Idempotency key was reused with a different request',
+      );
+    if (previous) {
+      send(response, previous.status, previous.body, requestId);
+      return;
+    }
+    if (body.decision !== 'accept' && body.decision !== 'reject')
+      throw new RepositoryError('INVALID_REQUEST', 400, 'decision must be accept or reject');
+    const output = repository.resolveNoticeTaskSync(
+      userId,
+      segments[1],
+      segments[3],
+      body.decision,
+      body.confirmed === true,
+      requestId,
+    );
+    repository.saveIdempotency(userId, path, key, hash, 200, output);
+    send(response, 200, output, requestId);
     return;
   }
   if (segments[0] === 'tasks' && segments[1] && request.method === 'GET' && segments.length === 2) {
@@ -678,6 +755,10 @@ async function handle(
         stringField(body, 'title')!,
         stringField(body, 'body')!,
         requestId,
+        {
+          status: body.status as NotificationRevision['status'] | undefined,
+          confirmed: body.confirmed === true,
+        },
       ),
     };
     repository.saveIdempotency(userId, path, key, hash, 201, output);

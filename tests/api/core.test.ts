@@ -499,3 +499,149 @@ test('publisher notice endpoints retain revision history and all side effects re
     repository.close();
   }
 });
+
+test('notice revisions create auditable task sync proposals and require user acceptance', async () => {
+  const ai = createParserServer();
+  const aiUrl = await listen(ai);
+  const repository = new Repository(':memory:');
+  const api = createApiServer({ repository, parserUrl: aiUrl });
+  const apiUrl = await listen(api.server);
+  const headers = { 'content-type': 'application/json', 'x-dev-user-id': 'synthetic-sync-user' };
+  const call = async (
+    method: string,
+    path: string,
+    body?: unknown,
+    extra: Record<string, string> = {},
+  ) => {
+    const result = await fetch(`${apiUrl}${path}`, {
+      method,
+      headers: { ...headers, ...extra },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+    return { result, body: result.status === 204 ? null : await result.json() };
+  };
+  try {
+    const document = await call(
+      'POST',
+      '/documents',
+      {
+        title: '合成同步通知',
+        text: '适用对象：本科生\n1. 完成登记\n截止：2099-10-01 前',
+        data_origin: 'synthetic',
+      },
+      { 'idempotency-key': 'sync-document-1' },
+    );
+    const parsed = await call(
+      'POST',
+      `/documents/${document.body.document.document_id}/parse`,
+      {},
+      { 'idempotency-key': 'sync-parse-1' },
+    );
+    const actionId = parsed.body.result.verified_actions[0].action_id as string;
+    await call(
+      'POST',
+      `/actions/${actionId}/confirm`,
+      { confirmed: true },
+      { 'idempotency-key': 'sync-confirm-1' },
+    );
+    const task = await call('POST', '/tasks', { actionId }, { 'idempotency-key': 'sync-task-1' });
+    const taskId = task.body.task.task_id as string;
+    const notice = await call(
+      'POST',
+      '/notices',
+      { title: '合成同步通知', body: '截止：2099-10-01 前' },
+      { 'idempotency-key': 'sync-notice-1' },
+    );
+    const noticeId = notice.body.notice.notice_id as string;
+    await call(
+      'POST',
+      `/notices/${noticeId}/publish`,
+      { confirmed: true },
+      { 'idempotency-key': 'sync-publish-1' },
+    );
+    const link = await call(
+      'POST',
+      `/tasks/${taskId}/notices`,
+      { noticeId, confirmed: true },
+      { 'idempotency-key': 'sync-link-1' },
+    );
+    assert.equal(link.result.status, 201);
+    const linkReplay = await call(
+      'POST',
+      `/tasks/${taskId}/notices`,
+      { noticeId, confirmed: true },
+      { 'idempotency-key': 'sync-link-1' },
+    );
+    assert.deepEqual(linkReplay.body, link.body);
+    const replacement = await call(
+      'POST',
+      `/notices/${noticeId}/revisions`,
+      { title: '延期后的合成同步通知', body: '截止：2099-10-08 前' },
+      { 'idempotency-key': 'sync-revision-1' },
+    );
+    await call(
+      'POST',
+      `/notices/${noticeId}/publish`,
+      { confirmed: true },
+      { 'idempotency-key': 'sync-publish-2' },
+    );
+    const pending = await call('GET', `/tasks/${taskId}/notice-sync`);
+    const replacementEvent = pending.body.sync[0].events.at(-1);
+    assert.equal(replacementEvent.change_type, 'replaced');
+    assert.equal(replacementEvent.status, 'pending_review');
+    assert.notEqual(replacement.body.revision.revision_id, link.body.link.revision_id);
+    const noConfirmation = await call(
+      'POST',
+      `/tasks/${taskId}/notice-sync/${replacementEvent.sync_event_id}/resolve`,
+      { decision: 'reject' },
+      { 'idempotency-key': 'sync-resolve-missing-1' },
+    );
+    assert.equal(noConfirmation.result.status, 400);
+    assert.equal(noConfirmation.body.error.code, 'CONFIRMATION_REQUIRED');
+    const rejected = await call(
+      'POST',
+      `/tasks/${taskId}/notice-sync/${replacementEvent.sync_event_id}/resolve`,
+      { decision: 'reject', confirmed: true },
+      { 'idempotency-key': 'sync-reject-1' },
+    );
+    assert.equal(rejected.result.status, 200);
+    assert.equal(rejected.body.sync.status, 'rejected');
+    const revokeWithoutConfirmation = await call(
+      'POST',
+      `/notices/${noticeId}/revisions`,
+      { title: '未确认的撤销', body: '本通知撤销', status: 'revoked' },
+      { 'idempotency-key': 'sync-revoked-missing-1' },
+    );
+    assert.equal(revokeWithoutConfirmation.result.status, 400);
+    assert.equal(revokeWithoutConfirmation.body.error.code, 'CONFIRMATION_REQUIRED');
+    const revoked = await call(
+      'POST',
+      `/notices/${noticeId}/revisions`,
+      {
+        title: '撤销的合成同步通知',
+        body: '本通知撤销',
+        status: 'revoked',
+        confirmed: true,
+      },
+      { 'idempotency-key': 'sync-revoked-1' },
+    );
+    assert.equal(revoked.result.status, 201);
+    const afterRevoke = await call('GET', `/tasks/${taskId}/notice-sync`);
+    const revokeEvent = afterRevoke.body.sync[0].events.at(-1);
+    assert.equal(revokeEvent.change_type, 'revoked');
+    const accepted = await call(
+      'POST',
+      `/tasks/${taskId}/notice-sync/${revokeEvent.sync_event_id}/resolve`,
+      { decision: 'accept', confirmed: true },
+      { 'idempotency-key': 'sync-accept-revoke-1' },
+    );
+    assert.equal(accepted.result.status, 200);
+    assert.equal(accepted.body.sync.status, 'accepted');
+    assert.equal(accepted.body.task.status, 'cancelled');
+    assert.equal(repository.getAction('synthetic-sync-user', actionId)?.task_status, 'cancelled');
+  } finally {
+    await close(api.server);
+    await close(ai);
+    repository.close();
+  }
+});

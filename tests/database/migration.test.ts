@@ -28,6 +28,8 @@ test('SQLite migration is repeatable, foreign keys are enabled, and all core tab
     'task_events',
     'notices',
     'notification_revisions',
+    'notice_task_links',
+    'notice_task_sync_events',
     'feedback',
     'audit_events',
     'idempotency_keys',
@@ -44,7 +46,7 @@ test('SQLite migration is repeatable, foreign keys are enabled, and all core tab
         version: number;
       }>
     ).map((row) => row.version),
-    [1, 2],
+    [1, 2, 3],
   );
   db.exec(
     "INSERT INTO users (user_id, open_id, created_at) VALUES ('history-user', 'history-open', '2099-01-01T00:00:00Z')",

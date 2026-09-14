@@ -3,7 +3,9 @@ import type { Document } from '@campus-action-os/protocol';
 export type OcrRequest = Pick<
   Document,
   'document_id' | 'content_type' | 'content_sha256' | 'data_origin'
->;
+> & {
+  content?: Uint8Array;
+};
 
 export type OcrExtraction =
   | {

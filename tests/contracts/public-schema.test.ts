@@ -39,6 +39,25 @@ test('public domain schemas are loadable and reject unknown fields', () => {
   };
   assert.equal(validateDocument(document).ok, true);
   assert.equal(
+    validateDocument({
+      ...document,
+      document_id: 'media-doc-1',
+      content_type: 'image/png',
+      text: '',
+      content_sha256: createHash('sha256').update('', 'utf8').digest('hex'),
+    }).ok,
+    true,
+  );
+  assert.equal(
+    validateDocument({
+      ...document,
+      document_id: 'empty-text-doc',
+      text: '',
+      content_sha256: createHash('sha256').update('', 'utf8').digest('hex'),
+    }).ok,
+    false,
+  );
+  assert.equal(
     validateUserProfile({
       schema_version: 'user-profile/v1',
       profile_id: 'user-1',

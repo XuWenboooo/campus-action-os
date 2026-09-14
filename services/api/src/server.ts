@@ -106,6 +106,25 @@ function contentType(value: unknown): Document['content_type'] {
   throw new RepositoryError('UNSUPPORTED_CONTENT_TYPE', 415, 'Unsupported document content type');
 }
 
+const maxBinaryUploadBytes = 800_000;
+
+function binaryUpload(value: unknown): Uint8Array {
+  if (typeof value !== 'string' || value.length === 0 || value.length % 4 !== 0)
+    throw new RepositoryError('INVALID_REQUEST', 400, 'content_base64 must be canonical Base64');
+  if (!/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(value))
+    throw new RepositoryError('INVALID_REQUEST', 400, 'content_base64 must be canonical Base64');
+  const content = Buffer.from(value, 'base64');
+  if (content.byteLength === 0 || content.byteLength > maxBinaryUploadBytes)
+    throw new RepositoryError(
+      'TEXT_TOO_LARGE',
+      413,
+      `Binary upload must be between 1 and ${maxBinaryUploadBytes} bytes`,
+    );
+  if (content.toString('base64') !== value)
+    throw new RepositoryError('INVALID_REQUEST', 400, 'content_base64 must be canonical Base64');
+  return content;
+}
+
 function dataOrigin(value: unknown): Document['data_origin'] {
   if (value === undefined) return 'user_provided';
   if (value === 'synthetic' || value === 'user_provided') return value;
@@ -163,7 +182,11 @@ async function parseDocument(
   parserBaseUrl: string,
   options: ApiServerOptions,
 ): Promise<void> {
-  const normalized = await normalizeDocument(document, options.ocrProvider);
+  const normalized = await normalizeDocument(
+    document,
+    options.ocrProvider,
+    repository.getDocumentContent(userId, document.document_id) ?? undefined,
+  );
   if (!normalized.ok) {
     repository.failParseJob(
       userId,
@@ -343,13 +366,32 @@ async function handle(
       send(response, previous.status, previous.body, requestId);
       return;
     }
-    const text = stringField(body, 'text');
+    const uploaded = path === '/documents/upload';
+    const documentContentType = contentType(body.contentType);
+    let sourceContent: Uint8Array | undefined;
+    let text: string | undefined;
+    if (
+      uploaded &&
+      (documentContentType === 'image/png' || documentContentType === 'application/pdf')
+    ) {
+      sourceContent = binaryUpload(body.content_base64);
+      text = stringField(body, 'text', false) ?? '';
+    } else {
+      if (uploaded && body.content_base64 !== undefined)
+        throw new RepositoryError(
+          'UNSUPPORTED_CONTENT_TYPE',
+          415,
+          'content_base64 uploads require image/png or application/pdf',
+        );
+      text = stringField(body, 'text');
+    }
     const document = repository.createDocument({
       ownerUserId: userId,
       title: stringField(body, 'title', false) ?? '校园通知',
-      contentType: contentType(body.contentType),
+      contentType: documentContentType,
       text: text!,
       dataOrigin: dataOrigin(body.data_origin),
+      sourceContent,
     });
     const output = { document };
     repository.saveIdempotency(userId, path, key, hash, 201, output);

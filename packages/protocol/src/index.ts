@@ -769,6 +769,21 @@ export function validateUserProfile(
 export function validateDocument(value: unknown, rootDir = sourceRoot): ValidationResult<Document> {
   const result = validate<Document>('document', value, rootDir);
   if (!result.ok) return result;
+  if (
+    (result.value.content_type === 'text/plain' || result.value.content_type === 'text/html') &&
+    result.value.text.trim().length === 0
+  ) {
+    return {
+      ok: false,
+      errors: [
+        {
+          path: '/text',
+          keyword: 'semantic',
+          message: 'text content types require non-empty text',
+        },
+      ],
+    };
+  }
   const actualHash = createHash('sha256').update(result.value.text, 'utf8').digest('hex');
   return actualHash === result.value.content_sha256
     ? result

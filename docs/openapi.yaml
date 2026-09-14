@@ -47,6 +47,26 @@ components:
               text: { type: string }
               contentType: { type: string }
               data_origin: { enum: [synthetic, user_provided] }
+    DocumentUploadInput:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [contentType]
+            properties:
+              title: { type: string }
+              text: { type: string }
+              contentType: { enum: [text/plain, text/html, image/png, application/pdf] }
+              content_base64:
+                {
+                  type: string,
+                  description: Canonical Base64; maximum decoded size is 800000 bytes,
+                }
+              data_origin: { enum: [synthetic, user_provided] }
+            anyOf:
+              - required: [text]
+              - required: [content_base64]
     Confirmation:
       required: true
       content:
@@ -181,7 +201,7 @@ paths:
       security: [{ devUser: [] }]
       parameters:
         - { $ref: '#/components/parameters/IdempotencyKey' }
-      requestBody: { $ref: '#/components/requestBodies/DocumentInput' }
+      requestBody: { $ref: '#/components/requestBodies/DocumentUploadInput' }
       responses:
         '201': { description: Created document }
   /documents/{documentId}:

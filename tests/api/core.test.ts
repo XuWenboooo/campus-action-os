@@ -424,6 +424,98 @@ test('API can route a controlled synthetic OCR result through the normal parse l
   }
 });
 
+test('API persists binary media uploads and passes source bytes to a controlled OCR provider', async () => {
+  const ai = createParserServer();
+  const aiUrl = await listen(ai);
+  const repository = new Repository(':memory:');
+  let receivedContent: Uint8Array | undefined;
+  const api = createApiServer({
+    repository,
+    parserUrl: aiUrl,
+    ocrProvider: {
+      name: 'synthetic-binary-ocr-test-only',
+      async extract(request) {
+        receivedContent = request.content;
+        return {
+          status: 'succeeded' as const,
+          text: '适用对象：本科生\n1. 完成截图中的申请\n截止：2099-10-03 17:00 前',
+          provider: 'synthetic-binary-ocr-test-only',
+          version: 'test/1.0.0',
+        };
+      },
+    },
+  });
+  const url = await listen(api.server);
+  const headers = {
+    'content-type': 'application/json',
+    'x-dev-user-id': 'binary-upload-student',
+  };
+  const raw = Buffer.from(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+    'base64',
+  );
+  try {
+    const missingContent = await fetch(`${url}/documents/upload`, {
+      method: 'POST',
+      headers: { ...headers, 'idempotency-key': 'binary-missing-1' },
+      body: JSON.stringify({ contentType: 'image/png', data_origin: 'synthetic' }),
+    });
+    const missingBody = await missingContent.json();
+    assert.equal(missingContent.status, 400);
+    assert.equal(missingBody.error.code, 'INVALID_REQUEST');
+
+    const malformedContent = await fetch(`${url}/documents/upload`, {
+      method: 'POST',
+      headers: { ...headers, 'idempotency-key': 'binary-malformed-1' },
+      body: JSON.stringify({
+        contentType: 'application/pdf',
+        content_base64: 'not-canonical-base64',
+        data_origin: 'synthetic',
+      }),
+    });
+    const malformedBody = await malformedContent.json();
+    assert.equal(malformedContent.status, 400);
+    assert.equal(malformedBody.error.code, 'INVALID_REQUEST');
+
+    const uploaded = await fetch(`${url}/documents/upload`, {
+      method: 'POST',
+      headers: { ...headers, 'idempotency-key': 'binary-upload-1' },
+      body: JSON.stringify({
+        title: '合成截图二进制通知',
+        contentType: 'image/png',
+        content_base64: raw.toString('base64'),
+        data_origin: 'synthetic',
+      }),
+    });
+    const uploadedBody = await uploaded.json();
+    assert.equal(uploaded.status, 201);
+    assert.equal(uploadedBody.document.text, '');
+    const documentId = uploadedBody.document.document_id as string;
+    assert.equal(
+      repository.getDocumentFile('binary-upload-student', documentId)?.byte_length,
+      raw.length,
+    );
+    assert.deepEqual(
+      Buffer.from(repository.getDocumentContent('binary-upload-student', documentId)!),
+      raw,
+    );
+
+    const parsed = await fetch(`${url}/documents/${documentId}/parse`, {
+      method: 'POST',
+      headers: { ...headers, 'idempotency-key': 'binary-parse-1' },
+      body: '{}',
+    });
+    const parsedBody = await parsed.json();
+    assert.equal(parsed.status, 202);
+    assert.equal(parsedBody.status, 'succeeded');
+    assert.deepEqual(Buffer.from(receivedContent!), raw);
+  } finally {
+    await close(api.server);
+    await close(ai);
+    repository.close();
+  }
+});
+
 test('API normalizes simple HTML before handing it to the text parser', async () => {
   const ai = createParserServer();
   const aiUrl = await listen(ai);

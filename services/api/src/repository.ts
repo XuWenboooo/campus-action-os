@@ -45,6 +45,10 @@ function text(value: unknown): string {
   return String(value);
 }
 
+function sha256Bytes(value: Uint8Array): string {
+  return createHash('sha256').update(value).digest('hex');
+}
+
 function now(): string {
   return new Date().toISOString();
 }
@@ -232,6 +236,15 @@ export type CreateDocumentInput = {
   contentType: Document['content_type'];
   text: string;
   dataOrigin?: Document['data_origin'];
+  sourceContent?: Uint8Array;
+};
+
+export type DocumentFile = {
+  document_id: string;
+  content_type: 'image/png' | 'application/pdf';
+  byte_length: number;
+  content_sha256: string;
+  created_at: string;
 };
 
 export type NoticeRevisionInput = {
@@ -313,6 +326,18 @@ export class Repository {
 
   createDocument(input: CreateDocumentInput): Document {
     this.ensureUser(input.ownerUserId);
+    if (
+      input.sourceContent !== undefined &&
+      input.contentType !== 'image/png' &&
+      input.contentType !== 'application/pdf'
+    )
+      throw new RepositoryError(
+        'INVALID_DOCUMENT',
+        400,
+        'Binary source content is only supported for image/png or application/pdf',
+      );
+    if (input.sourceContent !== undefined && input.sourceContent.byteLength === 0)
+      throw new RepositoryError('INVALID_DOCUMENT', 400, 'Binary source content cannot be empty');
     const document: Document = {
       schema_version: 'document/v1',
       document_id: input.documentId ?? randomUUID(),
@@ -331,6 +356,7 @@ export class Repository {
         400,
         valid.errors[0]?.message ?? 'Invalid document',
       );
+    this.db.exec('BEGIN');
     try {
       this.db
         .prepare(
@@ -346,12 +372,68 @@ export class Repository {
           document.data_origin,
           document.created_at,
         );
+      if (input.sourceContent !== undefined) {
+        this.db
+          .prepare(
+            'INSERT INTO document_files (document_id, content, content_type, byte_length, content_sha256, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+          )
+          .run(
+            document.document_id,
+            input.sourceContent,
+            document.content_type,
+            input.sourceContent.byteLength,
+            sha256Bytes(input.sourceContent),
+            document.created_at,
+          );
+      }
+      this.db.exec('COMMIT');
     } catch (error) {
+      this.db.exec('ROLLBACK');
       if (String(error).includes('UNIQUE'))
         throw new RepositoryError('DOCUMENT_EXISTS', 409, 'Document already exists');
       throw error;
     }
     return document;
+  }
+
+  getDocumentFile(userId: string, documentId: string): DocumentFile | null {
+    const document = this.getDocument(userId, documentId);
+    if (!document) return null;
+    const row = this.db
+      .prepare(
+        'SELECT document_id, content, content_type, byte_length, content_sha256, created_at FROM document_files WHERE document_id = ?',
+      )
+      .get(documentId) as Row | undefined;
+    if (!row) return null;
+    if (!(row.content instanceof Uint8Array))
+      throw new RepositoryError('DATA_CORRUPTION', 500, 'Stored document file is not binary data');
+    if (
+      row.content_type !== document.content_type ||
+      Number(row.byte_length) !== row.content.byteLength ||
+      sha256Bytes(row.content) !== text(row.content_sha256)
+    )
+      throw new RepositoryError(
+        'DATA_CORRUPTION',
+        500,
+        'Stored document file integrity check failed',
+      );
+    return {
+      document_id: text(row.document_id),
+      content_type: row.content_type as DocumentFile['content_type'],
+      byte_length: Number(row.byte_length),
+      content_sha256: text(row.content_sha256),
+      created_at: text(row.created_at),
+    };
+  }
+
+  getDocumentContent(userId: string, documentId: string): Uint8Array | null {
+    const file = this.getDocumentFile(userId, documentId);
+    if (!file) return null;
+    const row = this.db
+      .prepare('SELECT content FROM document_files WHERE document_id = ?')
+      .get(documentId) as Row | undefined;
+    if (!row || !(row.content instanceof Uint8Array)) return null;
+    return new Uint8Array(row.content);
   }
 
   getDocument(userId: string, documentId: string): Document | null {

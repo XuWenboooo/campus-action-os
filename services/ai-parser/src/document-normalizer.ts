@@ -43,6 +43,7 @@ function htmlToText(html: string): string {
 export async function normalizeDocument(
   document: Document,
   ocrProvider: OcrProvider = unconfiguredOcrProvider,
+  content?: Uint8Array,
 ): Promise<NormalizationResult> {
   let source: string;
   let sourceType: NormalizationSuccess['source'];
@@ -54,6 +55,7 @@ export async function normalizeDocument(
         content_type: document.content_type,
         content_sha256: document.content_sha256,
         data_origin: document.data_origin,
+        content,
       });
     } catch {
       return {

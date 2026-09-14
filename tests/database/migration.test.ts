@@ -19,6 +19,7 @@ test('SQLite migration is repeatable, foreign keys are enabled, and all core tab
     'users',
     'user_profiles',
     'documents',
+    'document_files',
     'parse_jobs',
     'verified_actions',
     'action_change_history',
@@ -46,7 +47,7 @@ test('SQLite migration is repeatable, foreign keys are enabled, and all core tab
         version: number;
       }>
     ).map((row) => row.version),
-    [1, 2, 3],
+    [1, 2, 3, 4],
   );
   db.exec(
     "INSERT INTO users (user_id, open_id, created_at) VALUES ('history-user', 'history-open', '2099-01-01T00:00:00Z')",
@@ -94,11 +95,35 @@ test('file-backed Repository survives close and reopen', () => {
       text: '适用对象：本科生\n1. 完成登记\n截止：2099-09-30 前',
       dataOrigin: 'synthetic',
     });
+    const raw = new Uint8Array([0, 1, 2, 3, 4]);
+    const mediaDocument = first.createDocument({
+      ownerUserId: 'persistent-user',
+      title: '持久化截图',
+      contentType: 'image/png',
+      text: '',
+      dataOrigin: 'synthetic',
+      sourceContent: raw,
+    });
+    const mediaFile = first.getDocumentFile('persistent-user', mediaDocument.document_id);
+    assert.ok(mediaFile);
+    assert.equal(mediaFile?.byte_length, 5);
+    assert.deepEqual(first.getDocumentContent('persistent-user', mediaDocument.document_id), raw);
+    first.db
+      .prepare('UPDATE document_files SET content_sha256 = ? WHERE document_id = ?')
+      .run('0'.repeat(64), mediaDocument.document_id);
+    assert.throws(
+      () => first.getDocumentContent('persistent-user', mediaDocument.document_id),
+      /integrity check failed/,
+    );
+    first.db
+      .prepare('UPDATE document_files SET content_sha256 = ? WHERE document_id = ?')
+      .run(mediaFile.content_sha256, mediaDocument.document_id);
     first.close();
 
     const second = new Repository(databasePath);
     assert.equal(second.getProfile('persistent-user').campus, '东校区');
     assert.deepEqual(second.getDocument('persistent-user', document.document_id), document);
+    assert.deepEqual(second.getDocumentContent('persistent-user', mediaDocument.document_id), raw);
     second.close();
   } finally {
     rmSync(directory, { recursive: true, force: true });

@@ -85,6 +85,19 @@ REGISTRY_COMPLETION = {
     'evidence_status': 'VALIDATED',
     'external_review_status': 'NONE',
 }
+COVERAGE_TAGS = (
+    'simple_single_action',
+    'multi_stage_action',
+    'conditional_action',
+    'multiple_deadlines',
+    'exception',
+    'revision',
+    'revocation',
+    'ambiguity',
+    'conflict',
+    'scanned_input',
+    'ocr_required',
+)
 
 
 def load_jsonl(path):
@@ -945,6 +958,78 @@ def audit_candidates(input_path, authorization_path):
     }
 
 
+def coverage_report(input_path):
+    rows = load_jsonl(input_path)
+    errors = []
+    valid_rows = []
+    for line_number, row in rows:
+        if is_parse_error(row):
+            errors.append(f'candidate line {line_number}: invalid JSON')
+            continue
+        if not isinstance(row, dict):
+            errors.append(f'candidate line {line_number}: record must be a JSON object')
+            continue
+        candidate_id = row.get('candidate_id')
+        if not isinstance(candidate_id, str) or not SAMPLE_ID.fullmatch(candidate_id):
+            errors.append(f'candidate line {line_number}: candidate_id must be a stable CABV1-* ID')
+            continue
+        if not isinstance(row.get('data_origin'), str) or row['data_origin'] not in FORMAL_ORIGINS:
+            errors.append(f'{candidate_id}: synthetic data cannot enter coverage diagnostics')
+            continue
+        valid_rows.append(row)
+
+    dimensions = {
+        'notice_category': Counter(),
+        'source_type': Counter(),
+        'input_type': Counter(),
+        'category_tags': Counter(),
+        'coverage_tags': Counter(),
+    }
+    unclassified = []
+    for row in valid_rows:
+        category = row.get('notice_category')
+        if isinstance(category, str) and category.strip():
+            dimensions['notice_category'][category] += 1
+        else:
+            unclassified.append({'sample_id': row['candidate_id'], 'field': 'notice_category'})
+        source_type = row.get('source_type')
+        if isinstance(source_type, str) and source_type.strip():
+            dimensions['source_type'][source_type] += 1
+        raw_input = row.get('raw_input')
+        input_type = raw_input.get('input_type') if isinstance(raw_input, dict) else None
+        if isinstance(input_type, str) and input_type.strip():
+            dimensions['input_type'][input_type] += 1
+        else:
+            unclassified.append({'sample_id': row['candidate_id'], 'field': 'raw_input.input_type'})
+        for field in ('category_tags', 'coverage_tags'):
+            tags = row.get(field)
+            if not isinstance(tags, list):
+                if field == 'coverage_tags':
+                    unclassified.append({'sample_id': row['candidate_id'], 'field': field})
+                continue
+            for tag in tags:
+                if isinstance(tag, str) and tag.strip():
+                    dimensions[field][tag] += 1
+    counts = {name: dict(sorted(values.items())) for name, values in dimensions.items()}
+    observed = set(counts['coverage_tags'])
+    missing = [tag for tag in COVERAGE_TAGS if tag not in observed]
+    status = 'BLOCKED' if not valid_rows or errors else 'READY_FOR_REVIEW'
+    return {
+        'pipeline': 'campus-action-bench-phase3b',
+        'pipeline_version': '1.0.0',
+        'status': status,
+        'formal_data_origin_only': True,
+        'input_count': len([row for _, row in rows if not is_parse_error(row)]),
+        'valid_candidate_count': len(valid_rows),
+        'dimensions': counts,
+        'required_coverage_tags': list(COVERAGE_TAGS),
+        'missing_coverage_tags': missing,
+        'unclassified': unclassified,
+        'errors': errors,
+        'note': 'Coverage is descriptive; missing tags are collection priorities, not permission to fabricate samples.',
+    }
+
+
 def plan_batches(rows, batch_size):
     if not TARGET_BATCH_MIN <= batch_size <= TARGET_BATCH_MAX:
         raise ValueError(f'batch size must be between {TARGET_BATCH_MIN} and {TARGET_BATCH_MAX}')
@@ -997,6 +1082,9 @@ def main():
     deidentify_parser.add_argument('--input', required=True, type=Path)
     deidentify_parser.add_argument('--output', required=True, type=Path)
     deidentify_parser.add_argument('--report', required=True, type=Path)
+    coverage_parser = sub.add_parser('coverage-report')
+    coverage_parser.add_argument('--input', required=True, type=Path)
+    coverage_parser.add_argument('--out', required=True, type=Path)
     args = parser.parse_args()
     if args.command == 'audit-candidates':
         report = audit_candidates(args.input, args.authorization)
@@ -1042,6 +1130,11 @@ def main():
         write_json(args.report, report)
         print(json.dumps(report, ensure_ascii=False, indent=2))
         return 0
+    if args.command == 'coverage-report':
+        report = coverage_report(args.input)
+        write_json(args.out, report)
+        print(json.dumps(report, ensure_ascii=False, indent=2))
+        return 0 if report['status'] != 'BLOCKED' else 1
     return 2
 
 

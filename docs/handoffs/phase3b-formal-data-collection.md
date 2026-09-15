@@ -28,6 +28,14 @@ python tools/benchmark/phase3b_pipeline.py deidentify-candidates `
   --report <deidentification-report.json>
 ```
 
+脱敏批准后的候选可运行描述性 coverage 诊断，缺口只形成采集优先级，不改变真实性 gate：
+
+```powershell
+python tools/benchmark/phase3b_pipeline.py coverage-report `
+  --input <approved-candidate-registry.jsonl> `
+  --out <coverage-report.json>
+```
+
 完成 A/B 标注、仲裁和证据 QA 后，交付给 freeze gate 的 sample registry 还必须为每条样本记录：`sample_id`、`split`、`data_origin`、`document_sha256`、`authorization_status`、`deidentification_status`、`annotation_a_status`、`annotation_b_status`、`adjudication_status`、`gold_status`、`evidence_status`、`source_category`、`duplicate_family_id`、`revision_family_id` 和 `external_review_status`。这些状态不能由模型预测填充。
 
 ## Annotation batches

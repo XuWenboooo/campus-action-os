@@ -280,6 +280,27 @@ class Phase3BPipelineTest(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'semantic anchors disappeared'):
                 MODULE.deidentify_candidates(missing_path, root / 'missing-output.jsonl')
 
+    def test_coverage_report_is_descriptive_and_blocks_empty_or_synthetic_pools(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            empty = root / 'empty.jsonl'
+            empty.write_text('', encoding='utf-8')
+            report = MODULE.coverage_report(empty)
+            self.assertEqual(report['status'], 'BLOCKED')
+            self.assertEqual(report['valid_candidate_count'], 0)
+            self.assertIn('conditional_action', report['missing_coverage_tags'])
+            candidate_path = root / 'candidate.jsonl'
+            sample = formal_candidate(coverage_tags=['conditional_action', 'ocr_required'])
+            self.write_jsonl(candidate_path, [sample])
+            report = MODULE.coverage_report(candidate_path)
+            self.assertEqual(report['status'], 'READY_FOR_REVIEW')
+            self.assertEqual(report['dimensions']['notice_category'], {'academic': 1})
+            self.assertEqual(report['dimensions']['coverage_tags']['ocr_required'], 1)
+            self.write_jsonl(candidate_path, [sample | {'data_origin': 'synthetic'}])
+            report = MODULE.coverage_report(candidate_path)
+            self.assertEqual(report['status'], 'BLOCKED')
+            self.assertEqual(report['valid_candidate_count'], 0)
+
 
 if __name__ == '__main__':
     unittest.main()

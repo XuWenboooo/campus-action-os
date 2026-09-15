@@ -38,6 +38,7 @@ TARGET_BATCH_MIN = 25
 TARGET_BATCH_MAX = 50
 FORMAL_SAMPLE_COUNT = 800
 FORMAL_SPLIT_COUNTS = {'train': 480, 'dev': 160, 'test': 160}
+BENCHMARK_SCHEMA = Path(__file__).resolve().parents[2] / 'benchmark' / 'schema' / 'campus-action-bench-v1.schema.json'
 FORMAL_MANIFEST_SCHEMA = Path(__file__).resolve().parents[2] / 'benchmark' / 'schema' / 'campus-action-bench-manifest-v1.schema.json'
 FORMAL_PROTOCOLS = {
     'dataset': 'campus-action-bench-protocol/v1.0.0',
@@ -97,6 +98,11 @@ def write_json(path, value):
     path.write_text(json.dumps(value, ensure_ascii=False, indent=2, sort_keys=True) + '\n', encoding='utf-8')
 
 
+def write_jsonl(path, rows):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text('\n'.join(json.dumps(row, ensure_ascii=False, sort_keys=True) for row in rows) + '\n', encoding='utf-8')
+
+
 def file_digest(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
@@ -108,15 +114,18 @@ def relative_path(path, root):
         raise ValueError(f'file must be under manifest root: {path}') from error
 
 
-def file_record(path, root, record_count):
+def file_record(path, root, record_count, read_only=False):
     if not path.is_file():
         raise ValueError(f'required formal artifact is missing: {path}')
-    return {
+    record = {
         'path': relative_path(path, root),
         'sha256': file_digest(path),
         'bytes': path.stat().st_size,
         'record_count': record_count,
     }
+    if read_only:
+        record['read_only'] = True
+    return record
 
 
 def load_json(path):
@@ -298,7 +307,7 @@ def build_formal_manifest(registry_path, split_paths, leakage_path, seal_path, c
     leakage = validate_leakage_gate(leakage_path)
     validate_test_seal(seal_path)
     root = root.resolve()
-    files = [file_record(split_paths[split], root, FORMAL_SPLIT_COUNTS[split]) for split in ('train', 'dev', 'test')]
+    files = [file_record(split_paths[split], root, FORMAL_SPLIT_COUNTS[split], read_only=True) for split in ('train', 'dev', 'test')]
     registry_file = file_record(registry_path, root, FORMAL_SAMPLE_COUNT)
     config_sha256 = file_digest(config_path)
     manifest = {
@@ -367,6 +376,360 @@ def build_formal_manifest(registry_path, split_paths, leakage_path, seal_path, c
         raise ValueError('generated formal manifest failed schema validation: ' + '; '.join(schema_errors[:10]))
     write_json(output_path, manifest)
     return manifest
+
+
+def submission_hash(row):
+    payload = {key: value for key, value in row.items() if key not in {'submission_sha256', 'locked'}}
+    return hashlib.sha256(json.dumps(payload, ensure_ascii=False, sort_keys=True).encode('utf-8')).hexdigest()
+
+
+def validate_iso_timestamp(value, field):
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError(f'{field} must be a non-empty ISO-8601 timestamp')
+    try:
+        parsed = datetime.fromisoformat(value.replace('Z', '+00:00'))
+    except ValueError as error:
+        raise ValueError(f'{field} must be an ISO-8601 timestamp') from error
+    if parsed.tzinfo is None:
+        raise ValueError(f'{field} must include a timezone')
+
+
+def validate_formal_candidate(candidate):
+    if not isinstance(candidate, dict):
+        return ['candidate must be a JSON object']
+    authorization_id = candidate.get('authorization_record_id')
+    authorization = {
+        authorization_id: {
+            'authorization_status': 'AUTHORIZED',
+            'source': candidate.get('source_provenance'),
+        }
+    } if isinstance(authorization_id, str) else {}
+    errors = candidate_errors(candidate, authorization)
+    if not isinstance(candidate.get('source_group'), str) or not candidate['source_group'].strip():
+        errors.append('source_group is required')
+    if not isinstance(candidate.get('notice_category'), str) or not candidate['notice_category'].strip():
+        errors.append('notice_category is required')
+    raw_input = candidate.get('raw_input')
+    if not isinstance(raw_input, dict) or not isinstance(raw_input.get('ocr_text'), str) or not raw_input['ocr_text'].strip():
+        errors.append('raw_input.ocr_text is required')
+    if not isinstance(candidate.get('user_profile'), dict):
+        errors.append('user_profile is required')
+    return errors
+
+
+def validate_annotation_content(candidate, annotation):
+    if not isinstance(annotation, dict):
+        return ['annotation must be a JSON object']
+    gold = annotation.get('gold_candidate')
+    if not isinstance(gold, dict):
+        return ['gold_candidate is required']
+    errors = []
+    if gold.get('relevance') not in {'relevant', 'not_relevant', 'uncertain'}:
+        errors.append('gold_candidate.relevance is invalid')
+    actions = gold.get('actions')
+    if not isinstance(actions, list):
+        errors.append('gold_candidate.actions must be a list')
+        actions = []
+    action_ids = []
+    for index, action in enumerate(actions):
+        if not isinstance(action, dict):
+            errors.append(f'gold_candidate.actions[{index}] must be an object')
+            continue
+        action_id = action.get('action_id')
+        if not isinstance(action_id, str) or not action_id.strip():
+            errors.append(f'gold_candidate.actions[{index}].action_id is required')
+        elif action_id in action_ids:
+            errors.append(f'duplicate action_id: {action_id}')
+        action_ids.append(action_id)
+        for field in ('verb', 'object'):
+            if not isinstance(action.get(field), str) or not action[field].strip():
+                errors.append(f'gold_candidate.actions[{index}].{field} is required')
+        for field in ('deadlines', 'materials', 'conditions', 'exceptions'):
+            if field in action and not isinstance(action[field], list):
+                errors.append(f'gold_candidate.actions[{index}].{field} must be a list')
+    for field in ('ambiguities', 'conflicts', 'missing_information', 'risk_labels'):
+        if field in gold and not isinstance(gold[field], list):
+            errors.append(f'gold_candidate.{field} must be a list')
+    raw_text = candidate.get('raw_input', {}).get('ocr_text', '') if isinstance(candidate.get('raw_input'), dict) else ''
+    evidence = annotation.get('evidence_spans')
+    if not isinstance(evidence, list):
+        errors.append('evidence_spans must be a list')
+        evidence = []
+    for index, span in enumerate(evidence):
+        if not isinstance(span, dict):
+            errors.append(f'evidence_spans[{index}] must be an object')
+            continue
+        source_text = span.get('source_text')
+        start = span.get('text_start')
+        end = span.get('text_end')
+        if not isinstance(span.get('field'), str) or not span['field'].strip():
+            errors.append(f'evidence_spans[{index}].field is required')
+        if not isinstance(source_text, str) or not source_text:
+            errors.append(f'evidence_spans[{index}].source_text is required')
+        if not isinstance(start, int) or not isinstance(end, int) or start < 0 or end < start or end > len(raw_text):
+            errors.append(f'evidence_spans[{index}] has an invalid text range')
+        elif raw_text[start:end] != source_text:
+            errors.append(f'evidence_spans[{index}] does not round-trip to source text')
+    return errors
+
+
+def load_locked_submissions(path, expected_annotator, candidates):
+    rows = load_jsonl(path)
+    submissions = {}
+    errors = []
+    for line_number, row in rows:
+        if is_parse_error(row):
+            errors.append(f'{expected_annotator} line {line_number}: invalid JSON')
+            continue
+        if not isinstance(row, dict):
+            errors.append(f'{expected_annotator} line {line_number}: record must be a JSON object')
+            continue
+        sample_id = row.get('sample_id')
+        if not isinstance(sample_id, str) or sample_id not in candidates or sample_id in submissions:
+            errors.append(f'{expected_annotator} line {line_number}: invalid or duplicate sample_id')
+            continue
+        if row.get('annotator_id') != expected_annotator:
+            errors.append(f'{sample_id}: expected independent submission by {expected_annotator}')
+        if row.get('status') != 'submitted_locked' or row.get('locked') is not True:
+            errors.append(f'{sample_id}: original {expected_annotator} submission must be locked')
+        workspace_id = row.get('workspace_id')
+        if not isinstance(workspace_id, str) or not workspace_id.strip():
+            errors.append(f'{sample_id}: independent workspace_id is required')
+        try:
+            validate_iso_timestamp(row.get('submitted_at'), f'{sample_id}.submitted_at')
+        except ValueError as error:
+            errors.append(str(error))
+        recorded_hash = row.get('submission_sha256')
+        if not isinstance(recorded_hash, str) or not SHA256.fullmatch(recorded_hash):
+            errors.append(f'{sample_id}: submission_sha256 must be a lowercase SHA-256')
+        elif recorded_hash != submission_hash(row):
+            errors.append(f'{sample_id}: submission_sha256 does not match locked payload')
+        errors.extend(f'{sample_id}: {error}' for error in validate_annotation_content(candidates[sample_id], row))
+        submissions[sample_id] = row
+    missing = sorted(set(candidates) - set(submissions))
+    if missing:
+        errors.append(f'{expected_annotator} is missing submissions: {", ".join(missing)}')
+    return submissions, errors
+
+
+def annotation_field_value(annotation, field):
+    gold = annotation['gold_candidate']
+    if field in {'relevance', 'actions', 'ambiguities', 'conflicts'}:
+        return gold.get(field)
+    if field in {'deadlines', 'materials'}:
+        return [action.get(field, []) for action in gold.get('actions', [])]
+    if field == 'evidence_spans':
+        return annotation.get('evidence_spans')
+    return None
+
+
+def compare_annotations(annotation_a, annotation_b):
+    fields = ('relevance', 'actions', 'deadlines', 'materials', 'ambiguities', 'conflicts', 'evidence_spans')
+    differences = []
+    for field in fields:
+        value_a = annotation_field_value(annotation_a, field)
+        value_b = annotation_field_value(annotation_b, field)
+        if value_a != value_b:
+            differences.append({'field': field, 'annotation_A': value_a, 'annotation_B': value_b})
+    return differences
+
+
+def validate_adjudication(row, sample_id, annotation_a, annotation_b, differences, candidate):
+    if not isinstance(row, dict):
+        raise ValueError(f'{sample_id}: adjudication record must be a JSON object')
+    if row.get('sample_id') != sample_id:
+        raise ValueError(f'{sample_id}: adjudication sample_id mismatch')
+    status = row.get('adjudication_status')
+    if status not in {'ADJUDICATED', 'PENDING_EXTERNAL_REVIEW'}:
+        raise ValueError(f'{sample_id}: invalid adjudication_status')
+    if row.get('original_A_hash') != annotation_a['submission_sha256'] or row.get('original_B_hash') != annotation_b['submission_sha256']:
+        raise ValueError(f'{sample_id}: adjudication does not reference the locked A/B hashes')
+    if not isinstance(row.get('adjudicator_id'), str) or row['adjudicator_id'] in {annotation_a['annotator_id'], annotation_b['annotator_id']}:
+        raise ValueError(f'{sample_id}: adjudicator must be separate from A and B')
+    try:
+        validate_iso_timestamp(row.get('adjudicated_at'), f'{sample_id}.adjudicated_at')
+    except ValueError as error:
+        raise ValueError(str(error)) from error
+    if not isinstance(row.get('rationale'), str) or not row['rationale'].strip():
+        raise ValueError(f'{sample_id}: adjudication rationale is required')
+    if differences and (not isinstance(row.get('evidence'), list) or not row['evidence']):
+        raise ValueError(f'{sample_id}: disagreement adjudication requires source evidence')
+    if status == 'PENDING_EXTERNAL_REVIEW':
+        if not isinstance(row.get('pending_reason'), str) or not row['pending_reason'].strip():
+            raise ValueError(f'{sample_id}: pending external review requires pending_reason')
+        return None
+    selected = row.get('selected_submission')
+    if selected not in {'A', 'B'} and not isinstance(row.get('gold_candidate'), dict):
+        raise ValueError(f'{sample_id}: adjudication must select A/B or provide gold_candidate')
+    if selected in {'A', 'B'}:
+        selected_annotation = annotation_a if selected == 'A' else annotation_b
+    else:
+        selected_annotation = annotation_a
+    gold_candidate = row.get('gold_candidate', selected_annotation['gold_candidate'])
+    evidence_spans = row.get('evidence_spans', selected_annotation.get('evidence_spans'))
+    selected_payload = {'gold_candidate': gold_candidate, 'evidence_spans': evidence_spans}
+    errors = validate_annotation_content(candidate, selected_payload)
+    if errors:
+        raise ValueError(f'{sample_id}: adjudicated gold is invalid: {"; ".join(errors)}')
+    return {'gold_candidate': gold_candidate, 'evidence_spans': evidence_spans}
+
+
+def materialize_formal_sample(candidate, annotation_a, annotation_b, ruling, differences):
+    gold_candidate = ruling['gold_candidate']
+    action_graph = gold_candidate.get('action_graph')
+    if not isinstance(action_graph, dict):
+        action_graph = {'actions': gold_candidate.get('actions', []), 'dependencies': gold_candidate.get('dependencies', [])}
+    evidence = []
+    for span in ruling['evidence_spans']:
+        evidence.append({
+            'field': span['field'],
+            'text_start': span['text_start'],
+            'text_end': span['text_end'],
+            **({'evidence_group_id': span['evidence_group_id']} if isinstance(span.get('evidence_group_id'), str) else {}),
+            **({'polarity': span['polarity']} if isinstance(span.get('polarity'), str) else {}),
+        })
+    collection_timestamp = candidate.get('collection_timestamp')
+    collection_date = collection_timestamp[:10] if isinstance(collection_timestamp, str) and len(collection_timestamp) >= 10 else None
+    return {
+        'sample_id': candidate['candidate_id'],
+        'source_group': candidate['source_group'],
+        'provenance': {
+            'source_type': candidate['source_type'],
+            'authorization_status': 'documented',
+            'data_origin': candidate['data_origin'],
+            'authorization_record_id': candidate['authorization_record_id'],
+            'collection_date': collection_date,
+        },
+        'notice_category': candidate['notice_category'],
+        'raw_input': copy.deepcopy(candidate['raw_input']),
+        'user_profile': copy.deepcopy(candidate['user_profile']),
+        'gold': {
+            'relevance': gold_candidate['relevance'],
+            'action_graph': action_graph,
+            'field_evidence': evidence,
+            'ambiguities': gold_candidate.get('ambiguities', []),
+            'conflicts': gold_candidate.get('conflicts', []),
+            'missing_information': gold_candidate.get('missing_information', []),
+            'risk_labels': gold_candidate.get('risk_labels', []),
+        },
+        'annotation': {
+            'annotator_ids': [annotation_a['annotator_id'], annotation_b['annotator_id']],
+            'independent_result_hashes': [annotation_a['submission_sha256'], annotation_b['submission_sha256']],
+            'submitted_at': [annotation_a['submitted_at'], annotation_b['submitted_at']],
+            'adjudication_status': 'adjudicated',
+            'adjudicator_id': ruling['adjudicator_id'],
+            'disagreement_report_id': f"{candidate['candidate_id']}:disagreement",
+            'adjudication_record_id': f"{candidate['candidate_id']}:adjudication",
+        },
+        'revision': copy.deepcopy(candidate.get('revision')),
+        'data_version': 'campus-action-bench/v1.0.0',
+        'change_history': [{
+            'change_id': f"{candidate['candidate_id']}:adjudication",
+            'reason': ruling['rationale'],
+            'original_A_hash': annotation_a['submission_sha256'],
+            'original_B_hash': annotation_b['submission_sha256'],
+            'disagreement_type': ruling.get('disagreement_type', [item['field'] for item in differences]),
+        }],
+    }
+
+
+def validate_benchmark_sample(sample):
+    schema = json.loads(BENCHMARK_SCHEMA.read_text(encoding='utf-8'))
+    validator = Draft202012Validator(schema, format_checker=FormatChecker())
+    errors = sorted(validator.iter_errors(sample), key=lambda item: list(item.path))
+    if errors:
+        first = errors[0]
+        path = '/'.join(str(item) for item in first.path) or '/'
+        raise ValueError(f"{sample.get('sample_id')}: benchmark schema failed at {path}: {first.message}")
+
+
+def assemble_formal_batch(candidate_path, annotation_a_path, annotation_b_path, adjudication_path):
+    candidate_rows, candidate_load_errors = load_jsonl(candidate_path), []
+    candidates = {}
+    for line_number, row in candidate_rows:
+        if is_parse_error(row):
+            candidate_load_errors.append(f'candidate line {line_number}: invalid JSON')
+            continue
+        raw_sample_id = row.get('candidate_id') if isinstance(row, dict) else None
+        sample_id = raw_sample_id if isinstance(raw_sample_id, str) else f'line-{line_number}'
+        if sample_id in candidates:
+            candidate_load_errors.append(f'{sample_id}: duplicate candidate_id')
+            continue
+        errors = validate_formal_candidate(row)
+        if errors:
+            candidate_load_errors.extend(f'{sample_id}: {error}' for error in errors)
+        else:
+            candidates[sample_id] = row
+    if candidate_load_errors:
+        raise ValueError('formal annotation candidate gate blocked: ' + '; '.join(candidate_load_errors[:10]))
+    if not candidates:
+        raise ValueError('formal annotation batch cannot be empty')
+    if len(candidates) > TARGET_BATCH_MAX:
+        raise ValueError(f'formal annotation batch cannot exceed {TARGET_BATCH_MAX} candidates')
+    annotations_a, errors_a = load_locked_submissions(annotation_a_path, 'person-a', candidates)
+    annotations_b, errors_b = load_locked_submissions(annotation_b_path, 'person-b', candidates)
+    if errors_a or errors_b:
+        raise ValueError('independent annotation gate blocked: ' + '; '.join((errors_a + errors_b)[:10]))
+    if {row['workspace_id'] for row in annotations_a.values()} & {row['workspace_id'] for row in annotations_b.values()}:
+        raise ValueError('independent annotation gate blocked: A and B workspaces overlap')
+    adjudication_rows = load_jsonl(adjudication_path)
+    adjudications = {}
+    errors = []
+    for line_number, row in adjudication_rows:
+        if is_parse_error(row) or not isinstance(row, dict):
+            errors.append(f'adjudication line {line_number}: record must be valid JSON object')
+            continue
+        raw_sample_id = row.get('sample_id')
+        sample_id = raw_sample_id if isinstance(raw_sample_id, str) else f'line-{line_number}'
+        if sample_id in adjudications:
+            errors.append(f'{sample_id}: duplicate adjudication record')
+        else:
+            adjudications[sample_id] = row
+    missing_adjudications = sorted(set(candidates) - set(adjudications))
+    extra_adjudications = sorted(set(adjudications) - set(candidates))
+    if missing_adjudications:
+        errors.append('missing adjudications: ' + ', '.join(missing_adjudications))
+    if extra_adjudications:
+        errors.append('adjudications reference unknown samples: ' + ', '.join(extra_adjudications))
+    if errors:
+        raise ValueError('adjudication gate blocked: ' + '; '.join(errors[:10]))
+
+    disagreements = []
+    samples = []
+    pending = []
+    for sample_id in sorted(candidates):
+        annotation_a = annotations_a[sample_id]
+        annotation_b = annotations_b[sample_id]
+        differences = compare_annotations(annotation_a, annotation_b)
+        ruling = adjudications[sample_id]
+        resolved = validate_adjudication(ruling, sample_id, annotation_a, annotation_b, differences, candidates[sample_id])
+        disagreements.append({
+            'sample_id': sample_id,
+            'status': 'detected' if differences else 'none',
+            'differences': differences,
+        })
+        if resolved is None:
+            pending.append(sample_id)
+            continue
+        sample = materialize_formal_sample(candidates[sample_id], annotation_a, annotation_b, {**ruling, **resolved}, differences)
+        validate_benchmark_sample(sample)
+        samples.append(sample)
+    agreement_fields = {}
+    for field in ('relevance', 'actions', 'deadlines', 'materials', 'evidence_spans'):
+        agreements = sum(annotation_field_value(annotations_a[sample_id], field) == annotation_field_value(annotations_b[sample_id], field) for sample_id in candidates)
+        agreement_fields[field] = {'agreement_count': agreements, 'sample_count': len(candidates), 'agreement_rate': agreements / len(candidates)}
+    quality = {
+        'sample_count': len(candidates),
+        'annotation_a': len(annotations_a),
+        'annotation_b': len(annotations_b),
+        'adjudicated': len(samples),
+        'pending_external_review': len(pending),
+        'disagreement_count': sum(item['status'] == 'detected' for item in disagreements),
+        'disagreement_rate': sum(item['status'] == 'detected' for item in disagreements) / len(candidates),
+        'agreement': agreement_fields,
+    }
+    status = 'BLOCKED' if pending else 'READY'
+    return {'status': status, 'samples': samples if status == 'READY' else [], 'disagreements': disagreements, 'quality': quality, 'pending_sample_ids': pending}
 
 
 def load_authorizations(path):
@@ -529,6 +892,14 @@ def main():
     manifest_parser.add_argument('--frozen-at', required=True)
     manifest_parser.add_argument('--root', type=Path, default=Path.cwd())
     manifest_parser.add_argument('--out', required=True, type=Path)
+    assemble_parser = sub.add_parser('assemble-batch')
+    assemble_parser.add_argument('--candidates', required=True, type=Path)
+    assemble_parser.add_argument('--annotation-a', required=True, type=Path)
+    assemble_parser.add_argument('--annotation-b', required=True, type=Path)
+    assemble_parser.add_argument('--adjudication', required=True, type=Path)
+    assemble_parser.add_argument('--out', required=True, type=Path)
+    assemble_parser.add_argument('--disagreement-out', required=True, type=Path)
+    assemble_parser.add_argument('--quality-out', required=True, type=Path)
     args = parser.parse_args()
     if args.command == 'audit-candidates':
         report = audit_candidates(args.input, args.authorization)
@@ -556,6 +927,18 @@ def main():
             root=args.root,
         )
         print(json.dumps({'status': 'FROZEN', 'manifest_sha256': manifest['freeze']['manifest_sha256'], 'output': str(args.out)}, ensure_ascii=False, indent=2))
+        return 0
+    if args.command == 'assemble-batch':
+        report = assemble_formal_batch(args.candidates, args.annotation_a, args.annotation_b, args.adjudication)
+        write_json(args.disagreement_out, {'status': report['status'], 'disagreements': report['disagreements'], 'pending_sample_ids': report['pending_sample_ids']})
+        write_json(args.quality_out, report['quality'])
+        if report['status'] != 'READY':
+            print(json.dumps(report, ensure_ascii=False, indent=2))
+            return 1
+        if args.out.exists():
+            raise ValueError(f'refusing to overwrite existing gold batch: {args.out}')
+        write_jsonl(args.out, report['samples'])
+        print(json.dumps({'status': 'READY', 'sample_count': len(report['samples']), 'quality': report['quality']}, ensure_ascii=False, indent=2))
         return 0
     return 2
 

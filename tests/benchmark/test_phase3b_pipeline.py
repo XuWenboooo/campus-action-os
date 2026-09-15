@@ -43,6 +43,52 @@ def authorization(status='AUTHORIZED'):
     }
 
 
+def annotation(sample_id, annotator_id, workspace_id, relevance='relevant'):
+    value = {
+        'sample_id': sample_id,
+        'annotator_id': annotator_id,
+        'workspace_id': workspace_id,
+        'submitted_at': '2026-09-15T01:00:00Z',
+        'status': 'submitted_locked',
+        'locked': True,
+        'gold_candidate': {
+            'relevance': relevance,
+            'actions': [{
+                'action_id': 'a1',
+                'verb': 'submit',
+                'object': '课程回顾',
+                'deadlines': [],
+                'materials': [],
+                'conditions': [],
+                'exceptions': [],
+            }],
+            'ambiguities': [],
+            'conflicts': [],
+            'missing_information': [],
+            'risk_labels': [],
+        },
+        'evidence_spans': [{
+            'field': 'action',
+            'source_text': '提交课程回顾',
+            'text_start': 0,
+            'text_end': 6,
+            'evidence_group_id': 'e1',
+            'polarity': 'positive',
+        }],
+    }
+    value['submission_sha256'] = MODULE.submission_hash(value)
+    return value
+
+
+def formal_candidate():
+    return candidate(
+        source_group='authorized-source-group-001',
+        notice_category='academic',
+        raw_input={'input_type': 'text', 'ocr_text': '提交课程回顾', 'layout': {'pages': 1, 'blocks': []}},
+        user_profile={'profile_id': 'profile-001', 'attributes': {'enrollment': 'student'}},
+    )
+
+
 class Phase3BPipelineTest(unittest.TestCase):
     def write_jsonl(self, path, rows):
         path.write_text('\n'.join(json.dumps(row, ensure_ascii=False) for row in rows) + '\n', encoding='utf-8')
@@ -128,6 +174,67 @@ class Phase3BPipelineTest(unittest.TestCase):
                     root=root,
                 )
             self.assertFalse(output.exists())
+
+    def test_assemble_batch_locks_independent_annotations_and_materializes_gold(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            sample = formal_candidate()
+            candidates = root / 'candidates.jsonl'
+            annotation_a = root / 'annotation-a.jsonl'
+            annotation_b = root / 'annotation-b.jsonl'
+            adjudication = root / 'adjudication.jsonl'
+            self.write_jsonl(candidates, [sample])
+            a = annotation(sample['candidate_id'], 'person-a', 'workspace-a')
+            b = annotation(sample['candidate_id'], 'person-b', 'workspace-b', relevance='uncertain')
+            self.write_jsonl(annotation_a, [a])
+            self.write_jsonl(annotation_b, [b])
+            self.write_jsonl(adjudication, [{
+                'sample_id': sample['candidate_id'],
+                'adjudication_status': 'ADJUDICATED',
+                'original_A_hash': a['submission_sha256'],
+                'original_B_hash': b['submission_sha256'],
+                'adjudicator_id': 'person-adjudicator',
+                'adjudicated_at': '2026-09-15T02:00:00Z',
+                'selected_submission': 'A',
+                'disagreement_type': ['relevance'],
+                'evidence': ['提交课程回顾'],
+                'rationale': 'The source supports the actionable interpretation.',
+            }])
+            report = MODULE.assemble_formal_batch(candidates, annotation_a, annotation_b, adjudication)
+            self.assertEqual(report['status'], 'READY')
+            self.assertEqual(report['quality']['disagreement_count'], 1)
+            self.assertEqual(report['quality']['agreement']['evidence_spans']['agreement_count'], 1)
+            self.assertEqual(len(report['samples']), 1)
+            self.assertEqual(report['samples'][0]['annotation']['adjudication_status'], 'adjudicated')
+            MODULE.validate_benchmark_sample(report['samples'][0])
+
+    def test_assemble_batch_keeps_pending_adjudication_out_of_gold(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            sample = formal_candidate()
+            candidates = root / 'candidates.jsonl'
+            annotation_a = root / 'annotation-a.jsonl'
+            annotation_b = root / 'annotation-b.jsonl'
+            adjudication = root / 'adjudication.jsonl'
+            self.write_jsonl(candidates, [sample])
+            a = annotation(sample['candidate_id'], 'person-a', 'workspace-a')
+            b = annotation(sample['candidate_id'], 'person-b', 'workspace-b')
+            self.write_jsonl(annotation_a, [a])
+            self.write_jsonl(annotation_b, [b])
+            self.write_jsonl(adjudication, [{
+                'sample_id': sample['candidate_id'],
+                'adjudication_status': 'PENDING_EXTERNAL_REVIEW',
+                'original_A_hash': a['submission_sha256'],
+                'original_B_hash': b['submission_sha256'],
+                'adjudicator_id': 'person-adjudicator',
+                'adjudicated_at': '2026-09-15T02:00:00Z',
+                'pending_reason': 'Source is insufficient to resolve the disagreement.',
+                'rationale': 'Do not infer a gold value.',
+            }])
+            report = MODULE.assemble_formal_batch(candidates, annotation_a, annotation_b, adjudication)
+            self.assertEqual(report['status'], 'BLOCKED')
+            self.assertEqual(report['pending_sample_ids'], [sample['candidate_id']])
+            self.assertEqual(report['samples'], [])
 
 
 if __name__ == '__main__':

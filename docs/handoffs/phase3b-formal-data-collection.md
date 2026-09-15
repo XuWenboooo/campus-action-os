@@ -25,6 +25,21 @@ python tools/benchmark/phase3b_pipeline.py audit-candidates `
 
 READY 候选按 25–50 条一批执行：A 独立标注 → B 独立标注 → lock → disagreement detection → adjudication → QA → schema/evidence validation → batch manifest。批次失败不能进入下一批；未解决争议记录 `PENDING_EXTERNAL_REVIEW`，不能强行生成 gold。
 
+完成一个批次后，使用 `assemble-batch` 只读取两份彼此独立且已锁定的原始提交和仲裁记录：
+
+```powershell
+python tools/benchmark/phase3b_pipeline.py assemble-batch `
+  --candidates <candidate-registry.jsonl> `
+  --annotation-a <annotation-A.locked.jsonl> `
+  --annotation-b <annotation-B.locked.jsonl> `
+  --adjudication <adjudication.jsonl> `
+  --out <final-gold-batch.jsonl> `
+  --disagreement-out <disagreements.json> `
+  --quality-out <agreement-diagnostics.json>
+```
+
+该 gate 校验 A/B 工作区不同、原始提交锁定且 hash 可复算、证据 span 能回指脱敏原文、仲裁引用 A/B hash 和独立 source evidence；`PENDING_EXTERNAL_REVIEW` 只输出诊断、不输出 gold。
+
 正式状态顺序固定为：
 
 ```text

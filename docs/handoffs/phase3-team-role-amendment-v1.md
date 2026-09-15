@@ -9,13 +9,17 @@
 
 ## 角色
 
-| 人员                              | 固定职责                                                                                                                                                                    | 禁止职责                                                                       |
-| --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
-| Person A — Data / Annotation Lead | candidate ingestion、授权/脱敏、manifest、duplicate/leakage audit、Annotator A、实验协议管理、最终 test execution 管理                                                      | 在 Person B 独立提交前查看 B 的答案；依据模型输出决定 gold                     |
-| Person B — Independent Annotator  | Annotator B、独立 gold/evidence span 标注、提交后的 disagreement review、annotation QA                                                                                      | 在独立提交前查看 A 的答案；用模型预测决定 gold                                 |
-| Person C — Model Training Lead    | 模型训练、parser/model architecture、prompt/rule development、training pipeline、Train/Dev evaluation、hyperparameter tuning、ablation、experiment logging、reproducibility | 正式双人 gold annotation；test gold adjudication；在正式 test 前访问 test 内容 |
+| 人员                                                      | 固定职责                                                                                                                                                                                                                                                                                                                                           | 禁止职责                                                                        |
+| --------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| Person A — Project / Data / Evaluation Lead + Annotator A | Phase 3 工程协调、dataset pipeline、candidate ingestion、授权/脱敏、manifest、versioning、reproducibility、Git/artifact freeze、duplicate/leakage audit、split/sealing、Annotator A、disagreement/adjudication workflow、evaluator/experiment manifest freeze、model artifact hash 接收、test authorization、最终 test execution 和 metrics export | 在 Person B 独立提交前查看 B 的答案；依据模型输出决定 gold；单方面覆盖 B 的标注 |
+| Person B — Independent Annotator B                        | 第二份独立 gold/evidence span 标注、提交后的 disagreement review、annotation QA                                                                                                                                                                                                                                                                    | 在独立提交前查看 A 的答案；用模型预测决定 gold                                  |
+| Person C — Model Training Lead                            | 模型训练、parser/model architecture、prompt/rule development、training pipeline、Train/Dev evaluation、hyperparameter tuning、ablation、experiment logging、reproducibility                                                                                                                                                                        | 正式双人 gold annotation；test gold adjudication；在正式 test 前访问 test 内容  |
 
 Person A 与 Person B 的第一次标注必须在隔离工作区独立完成。提交后才允许依据冻结 guideline 和 source evidence 进行 disagreement review。若仍无法解决，记录 `ADJUDICATION_STATUS = PENDING_EXTERNAL_REVIEW`，不得用模型预测补齐 gold。
+
+## A ↔ C delivery boundary
+
+Person A → Person C 只交付 Train/Dev documents、Train/Dev gold 与 evidence、training manifest、冻结 schema 和 evaluator contract；不交付 Test raw/OCR/gold/evidence、per-case errors 或 disagreement/adjudication records。Person C → Person A 在正式 test 前必须交付并冻结：model artifact、model SHA-256、code commit、dependency lock、config、prompt/rules、hyperparameters、random seeds、training log、Dev results 和 inference command。
 
 ## 访问矩阵
 
@@ -63,6 +67,8 @@ python tools/benchmark/check-test-isolation.py `
 - dry-run 结果只验证流程，不进入 CampusActionBench-800，不产生正式指标。
 
 dry-run 通过后，顺序固定为：授权数据准备 → 脱敏 → candidate pool → A/B 独立标注 → disagreement/adjudication → split → leakage audit → manifest freeze → Train/Dev 交付 C → Test 继续 sealed。
+
+本轮已用仓库内 5 条 synthetic cases 实际执行上述流程，生成锁定提交、disagreement、adjudication、final gold、dry-run manifest、Train/Dev delivery package 和 isolation result；产物位于被忽略的 `benchmark/generated/phase3a-dry-run/`，不进入正式 benchmark。
 
 ## Amendment entry conditions
 

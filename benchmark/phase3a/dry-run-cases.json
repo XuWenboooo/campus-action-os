@@ -1,0 +1,58 @@
+[
+  {
+    "case_id": "CAB3A-SYN-001",
+    "document_id": "doc-cab3a-syn-001",
+    "source_group": "cab3a-simple-001",
+    "data_origin": "synthetic",
+    "benchmark_status": "phase3a_dry_run",
+    "input_type": "text",
+    "text": "【虚构大学】请于2099年10月3日17:00前提交课程回顾。",
+    "user_profile": {"enrollment": "fictional-course-student"},
+    "coverage": ["simple_single_action", "single_deadline"]
+  },
+  {
+    "case_id": "CAB3A-SYN-002",
+    "document_id": "doc-cab3a-syn-002",
+    "source_group": "cab3a-conditional-002",
+    "data_origin": "synthetic",
+    "benchmark_status": "phase3a_dry_run",
+    "input_type": "text",
+    "text": "仅限已报名‘星际园艺’的学生，请在2099年10月10日12:00前上传报名确认。",
+    "user_profile": {"enrollment": "fictional-course-student", "course": "星际园艺"},
+    "coverage": ["conditional_action", "audience_scope"]
+  },
+  {
+    "case_id": "CAB3A-SYN-003",
+    "document_id": "doc-cab3a-syn-003",
+    "source_group": "cab3a-multistage-003",
+    "data_origin": "synthetic",
+    "benchmark_status": "phase3a_dry_run",
+    "input_type": "text",
+    "text": "第一阶段：请在2099年9月1日前在线登记。第二阶段：请于2099年9月5日至9月7日到实验室核验。",
+    "user_profile": {"enrollment": "fictional-course-student"},
+    "coverage": ["multi_stage_action", "multiple_deadlines"]
+  },
+  {
+    "case_id": "CAB3A-SYN-004",
+    "document_id": "doc-cab3a-syn-004",
+    "source_group": "cab3a-materials-004",
+    "data_origin": "synthetic",
+    "benchmark_status": "phase3a_dry_run",
+    "input_type": "text",
+    "text": "请于2099年11月2日18:00前提交申请表和学生证复印件至教务平台。",
+    "user_profile": {"enrollment": "fictional-course-student"},
+    "coverage": ["materials", "field_evidence_spans"]
+  },
+  {
+    "case_id": "CAB3A-SYN-005",
+    "document_id": "doc-cab3a-syn-005",
+    "source_group": "cab3a-revocation-005",
+    "data_origin": "synthetic",
+    "benchmark_status": "phase3a_dry_run",
+    "input_type": "text",
+    "text": "原通知：请于2099年12月1日前缴费。修订通知：该缴费安排已撤销，无需缴费。",
+    "user_profile": {"enrollment": "fictional-course-student"},
+    "revision": {"kind": "revocation", "supersedes": "original-payment-notice"},
+    "coverage": ["revision", "revocation", "negative_evidence"]
+  }
+]

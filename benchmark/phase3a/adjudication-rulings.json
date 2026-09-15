@@ -1,0 +1,7 @@
+[
+  {"case_id":"CAB3A-SYN-001","selected_annotator":"person-a","disagreement_type":[],"evidence":["提交课程回顾","2099年10月3日17:00前"],"adjudicated_value":"A and B agree on the single action and deadline.","rationale":"Both independent submissions contain the same evidence-backed values."},
+  {"case_id":"CAB3A-SYN-002","selected_annotator":"person-a","disagreement_type":["audience_scope"],"evidence":["仅限已报名‘星际园艺’的学生"],"adjudicated_value":"仅限已报名‘星际园艺’的学生","rationale":"The notice explicitly narrows the audience; the shorter B value drops a condition."},
+  {"case_id":"CAB3A-SYN-003","selected_annotator":"person-a","disagreement_type":["ambiguity_label"],"evidence":["9月5日至9月7日到实验室核验"],"adjudicated_value":"保留两个阶段和两个独立时间边界","rationale":"The source contains two explicit stages; no deadline may be merged."},
+  {"case_id":"CAB3A-SYN-004","selected_annotator":"person-a","disagreement_type":[],"evidence":["申请表","学生证复印件"],"adjudicated_value":"申请表、学生证复印件均为材料","rationale":"Both material mentions are explicit and independently evidenced."},
+  {"case_id":"CAB3A-SYN-005","selected_annotator":"person-b","disagreement_type":["revocation_state"],"evidence":["该缴费安排已撤销，无需缴费"],"adjudicated_value":"原缴费行动已撤销且当前无有效缴费任务","rationale":"The revision explicitly revokes the original notice; the original deadline cannot remain active."}
+]

@@ -1,0 +1,47 @@
+[
+  {
+    "case_id": "CAB3A-SYN-001",
+    "annotator_id": "person-b",
+    "relevance": "relevant",
+    "actions": [{"action_id": "a1", "verb": "submit", "object": "课程回顾", "deadlines": [{"value": "2099-10-03T17:00:00+08:00", "precision": "minute"}], "materials": [], "conditions": [], "exceptions": []}],
+    "evidence": [{"field": "action", "text": "提交课程回顾"}, {"field": "deadline", "text": "2099年10月3日17:00前"}],
+    "ambiguities": [],
+    "conflicts": []
+  },
+  {
+    "case_id": "CAB3A-SYN-002",
+    "annotator_id": "person-b",
+    "relevance": "uncertain",
+    "actions": [{"action_id": "a1", "verb": "upload", "object": "报名确认", "deadlines": [{"value": "2099-10-10T12:00:00+08:00", "precision": "minute"}], "materials": [], "conditions": ["学生"], "exceptions": []}],
+    "evidence": [{"field": "condition", "text": "已报名‘星际园艺’的学生"}, {"field": "action", "text": "上传报名确认"}, {"field": "deadline", "text": "2099年10月10日12:00前"}],
+    "ambiguities": ["audience_scope_needs_adjudication"],
+    "conflicts": []
+  },
+  {
+    "case_id": "CAB3A-SYN-003",
+    "annotator_id": "person-b",
+    "relevance": "relevant",
+    "actions": [{"action_id": "a1", "verb": "register", "object": "在线登记", "deadlines": [{"value": "2099-09-01T23:59:59+08:00", "precision": "day"}], "materials": [], "conditions": [], "exceptions": []}, {"action_id": "a2", "verb": "verify", "object": "实验室核验", "deadlines": [{"value": "2099-09-05T00:00:00+08:00/2099-09-07T23:59:59+08:00", "precision": "day_range"}], "materials": [], "conditions": [], "exceptions": []}],
+    "evidence": [{"field": "action", "text": "9月1日前在线登记"}, {"field": "action", "text": "9月5日至9月7日到实验室核验"}],
+    "ambiguities": ["second_deadline_is_range"],
+    "conflicts": []
+  },
+  {
+    "case_id": "CAB3A-SYN-004",
+    "annotator_id": "person-b",
+    "relevance": "relevant",
+    "actions": [{"action_id": "a1", "verb": "submit", "object": "申请材料", "deadlines": [{"value": "2099-11-02T18:00:00+08:00", "precision": "minute"}], "materials": ["申请表", "学生证复印件"], "conditions": [], "exceptions": []}],
+    "evidence": [{"field": "action", "text": "提交申请表和学生证复印件至教务平台"}, {"field": "material", "text": "申请表"}, {"field": "material", "text": "学生证复印件"}, {"field": "deadline", "text": "2099年11月2日18:00前"}],
+    "ambiguities": [],
+    "conflicts": []
+  },
+  {
+    "case_id": "CAB3A-SYN-005",
+    "annotator_id": "person-b",
+    "relevance": "relevant",
+    "actions": [],
+    "evidence": [{"field": "revocation", "text": "该缴费安排已撤销，无需缴费"}],
+    "ambiguities": [],
+    "conflicts": []
+  }
+]

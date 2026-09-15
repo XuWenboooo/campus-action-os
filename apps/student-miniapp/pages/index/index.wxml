@@ -1,5 +1,5 @@
 <view class="page">
-  <view class="eyebrow">CAMPUS ACTION OS</view>
+  <view class="eyebrow">CAMPUS ACTION OS · 09 / 15</view>
   <view class="title">校园行动 OS</view>
   <view class="muted">今天，你只需要关注这些。</view>
   <view class="hero-stats">
@@ -7,7 +7,7 @@
     <view class="stat"><view class="stat-number">{{upcomingTasks.length + 3}}</view><view class="caption">未来 3 天</view></view>
     <view class="stat alert"><view class="stat-number">{{changedTasks.length}}</view><view class="caption">发生变化</view></view>
   </view>
-  <view class="section-title">Today <text class="caption">今天</text></view>
+  <view class="section-title row"><view>Today <text class="caption">今天</text></view><text class="section-link" bindtap="openTasks">全部任务 →</text></view>
   <view class="card action-card" wx:for="{{todayTasks}}" wx:key="task_id" bindtap="openTask" data-id="{{item.task_id}}">
     <view class="row"><text class="tag orange">待完成</text><text class="caption">{{item.source}}</text></view>
     <view class="card-title">{{item.title}}</view>

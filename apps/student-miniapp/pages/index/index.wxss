@@ -4,10 +4,13 @@
 .stat-number { font-size: 48rpx; font-weight: 700; }
 .stat .caption { color: rgba(255,255,255,.68); }
 .stat.alert .stat-number { color: #ffba76; }
+.section-link { color: #3047b8; font-size: 24rpx; font-weight: 600; }
 .card-title { font-size: 32rpx; font-weight: 700; margin-top: 20rpx; }
 .meta-row { color: #7a8498; display: flex; font-size: 24rpx; justify-content: space-between; margin-top: 22rpx; }
 .compact-card { padding: 24rpx 28rpx; }
+.compact-card .row { align-items: flex-start; }
 .compact-card .card-title { margin: 0; font-size: 29rpx; }
+.compact-card .tag { flex-shrink: 0; margin-left: 12rpx; }
 .change-card { border-left: 6rpx solid #d9656e; }
 .diff-preview { align-items: center; display: flex; font-size: 26rpx; margin-top: 20rpx; }
 .strike { color: #9ca3b3; text-decoration: line-through; }

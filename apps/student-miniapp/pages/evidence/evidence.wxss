@@ -4,7 +4,7 @@
 .chip-dot { background: #6e8ce7; border-radius: 50%; height: 12rpx; margin-right: 10rpx; width: 12rpx; }
 .chip-dot.deadline { background: #d9656e; }.chip-dot.materials { background: #c99142; }.chip-dot.action { background: #5a78d4; }.chip-dot.audience { background: #49a688; }
 .source-card { padding: 28rpx; }
-.source-text { color: #394255; font-size: 29rpx; line-height: 2; margin-top: 28rpx; }
+.source-text { color: #394255; font-size: 29rpx; line-height: 2; margin-top: 28rpx; white-space: pre-wrap; }
 .evidence-list { background: #fff; border-radius: 20rpx; padding: 4rpx 26rpx; }
 .evidence-item { border-bottom: 1rpx solid #edf0f5; padding: 24rpx 0; }
 .evidence-item:last-child { border: 0; }

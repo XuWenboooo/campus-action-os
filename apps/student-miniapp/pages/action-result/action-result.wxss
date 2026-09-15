@@ -1,0 +1,16 @@
+.result-sub { align-items: center; display: flex; gap: 14rpx; margin-top: 18rpx; }
+.relevance { background: #eef2ff; border: 0; }
+.relevance-text { color: #3e4d87; font-size: 26rpx; margin-top: 10rpx; }
+.action-result-card { margin-top: 30rpx; }
+.action-title { font-size: 38rpx; font-weight: 700; margin: 28rpx 0; }
+.deadline-label { color: #98a0b1; font-size: 21rpx; letter-spacing: 2rpx; }
+.field-grid { display: grid; grid-template-columns: 1fr 1fr; row-gap: 26rpx; margin-top: 30rpx; }
+.field-value { color: #30394b; font-size: 27rpx; margin-top: 5rpx; }
+.why-row { align-items: center; display: flex; justify-content: space-between; }
+.why-title { color: #3047b8; font-size: 29rpx; font-weight: 700; }
+.why-arrow { color: #3047b8; font-size: 36rpx; }
+.graph { background: #fff; border-radius: 20rpx; padding: 8rpx 28rpx; }
+.graph-step { align-items: flex-start; display: flex; padding: 20rpx 0; position: relative; }
+.graph-step:not(:last-child):after { background: #dfe4f3; content: ''; height: 30rpx; left: 23rpx; position: absolute; top: 68rpx; width: 2rpx; }
+.graph-number { align-items: center; background: #eaf0ff; border-radius: 50%; color: #3047b8; display: flex; font-size: 21rpx; height: 48rpx; justify-content: center; margin-right: 20rpx; width: 48rpx; }
+.bottom-bar .ghost { margin-top: 12rpx; }

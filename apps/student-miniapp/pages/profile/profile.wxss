@@ -1,0 +1,4 @@
+.profile-summary { align-items: center; display: flex; margin-top: 34rpx; }
+.avatar { align-items: center; background: #202d72; border-radius: 18rpx; color: #fff; display: flex; font-size: 27rpx; font-weight: 700; height: 74rpx; justify-content: center; margin-right: 18rpx; width: 74rpx; }
+.profile-summary .card-title { font-size: 29rpx; margin: 0 0 6rpx; }
+.tag-row { display: flex; flex-wrap: wrap; gap: 12rpx; margin-bottom: 30rpx; }

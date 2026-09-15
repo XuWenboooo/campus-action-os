@@ -3,6 +3,8 @@ const api = require('../../utils/api');
 Page({
   data: {
     text: '',
+    scenario: 'student',
+    scenarioLabel: '',
     loading: false,
     error: '',
     filePath: '',
@@ -13,8 +15,18 @@ Page({
     manualTitle: '',
     manualDueAt: '',
   },
+  onLoad(options) {
+    if (options && options.scenario) {
+      this.setData({ scenario: options.scenario });
+      api.getDemoScenario(options.scenario).then((scenario) => this.setData({ text: scenario.source, scenarioLabel: scenario.label }));
+    }
+  },
   onInput(event) {
     this.setData({ text: event.detail.value });
+  },
+  loadScenario(event) {
+    const scenario = event.currentTarget.dataset.scenario;
+    api.getDemoScenario(scenario).then((result) => this.setData({ scenario, scenarioLabel: result.label, text: result.source, error: '' }));
   },
   chooseFile() {
     wx.chooseMessageFile({

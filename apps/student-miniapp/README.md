@@ -4,4 +4,6 @@
 
 导入项目后请把 `app.js` 中的 `apiBaseUrl` 指向开发机可访问地址。微信开发者工具运行、设备兼容性、网络配置和页面交互仍必须按 `docs/manual-wechat-verification.md` 人工验证，当前状态是 `MANUAL_VERIFICATION_REQUIRED`。
 
+当前前端 MVP 默认开启 `app.js` 的 `globalData.useMock`，可独立演示 Action Center → Import → Parsing → Action Result → Evidence → Task Detail 以及 Notification Diff 全链路。Mock 状态保存在微信本地存储中；接入真实服务时将该开关关闭，页面仍通过 `utils/api.js` 的统一 adapter 调用后端。
+
 `src/protocol.ts` 是客户端与共享协议包的唯一边界；它不在小程序包内保存模型服务密钥。

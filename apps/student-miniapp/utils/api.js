@@ -3,6 +3,7 @@ function appConfig() {
   return {
     baseUrl: (app && app.globalData.apiBaseUrl) || 'http://127.0.0.1:3000',
     userId: (app && app.globalData.userId) || 'dev-user',
+    useMock: Boolean(app && app.globalData.useMock),
   };
 }
 
@@ -37,9 +38,11 @@ function key(prefix) {
 
 module.exports = {
   getTasks() {
+    if (appConfig().useMock) return require('./mock').getTasks();
     return request('/tasks');
   },
   createDocument(text) {
+    if (appConfig().useMock) return require('./mock').createDocument(text);
     return request('/documents', {
       method: 'POST',
       idempotencyKey: key('document'),
@@ -47,6 +50,7 @@ module.exports = {
     });
   },
   uploadMediaDocument(filePath, contentType, title) {
+    if (appConfig().useMock) return require('./mock').uploadMediaDocument(filePath, contentType, title);
     return new Promise((resolve, reject) => {
       wx.getFileSystemManager().readFile({
         filePath,
@@ -68,6 +72,7 @@ module.exports = {
     });
   },
   parseDocument(documentId) {
+    if (appConfig().useMock) return require('./mock').parseDocument(documentId);
     return request(`/documents/${documentId}/parse`, {
       method: 'POST',
       idempotencyKey: key('parse'),
@@ -75,9 +80,11 @@ module.exports = {
     });
   },
   getParseJob(parseJobId) {
+    if (appConfig().useMock) return require('./mock').getParseJob(parseJobId);
     return request(`/parse-jobs/${parseJobId}`);
   },
   confirmAction(actionId) {
+    if (appConfig().useMock) return require('./mock').confirmAction(actionId);
     return request(`/actions/${actionId}/confirm`, {
       method: 'POST',
       idempotencyKey: key('confirm'),
@@ -85,6 +92,7 @@ module.exports = {
     });
   },
   rejectAction(actionId) {
+    if (appConfig().useMock) return require('./mock').rejectAction(actionId);
     return request(`/actions/${actionId}/reject`, {
       method: 'POST',
       idempotencyKey: key('reject'),
@@ -92,6 +100,7 @@ module.exports = {
     });
   },
   createTask(actionId) {
+    if (appConfig().useMock) return require('./mock').createTask(actionId);
     return request('/tasks', {
       method: 'POST',
       idempotencyKey: key('task'),
@@ -99,6 +108,7 @@ module.exports = {
     });
   },
   createManualTask(documentId, title, dueAt) {
+    if (appConfig().useMock) return require('./mock').createManualTask(documentId, title, dueAt);
     return request('/tasks/manual', {
       method: 'POST',
       idempotencyKey: key('manual-task'),
@@ -106,6 +116,7 @@ module.exports = {
     });
   },
   linkTaskNotice(taskId, noticeId) {
+    if (appConfig().useMock) return Promise.resolve({ ok: true, taskId, noticeId });
     return request(`/tasks/${taskId}/notices`, {
       method: 'POST',
       idempotencyKey: key('task-notice-link'),
@@ -113,9 +124,11 @@ module.exports = {
     });
   },
   getTaskNoticeSync(taskId) {
+    if (appConfig().useMock) return Promise.resolve({ sync: [] });
     return request(`/tasks/${taskId}/notice-sync`);
   },
   resolveTaskNoticeSync(taskId, syncEventId, decision) {
+    if (appConfig().useMock) return Promise.resolve({ ok: true, taskId, syncEventId, decision });
     return request(`/tasks/${taskId}/notice-sync/${syncEventId}/resolve`, {
       method: 'POST',
       idempotencyKey: key('task-notice-sync'),
@@ -123,6 +136,7 @@ module.exports = {
     });
   },
   completeTask(taskId) {
+    if (appConfig().useMock) return require('./mock').completeTask(taskId);
     return request(`/tasks/${taskId}/complete`, {
       method: 'POST',
       idempotencyKey: key('complete'),
@@ -130,16 +144,43 @@ module.exports = {
     });
   },
   getProfile() {
+    if (appConfig().useMock) return require('./mock').getProfile();
     return request('/users/me');
   },
   exportUserData() {
+    if (appConfig().useMock) return require('./mock').exportUserData();
     return request('/users/me/export');
   },
   updateProfile(data) {
+    if (appConfig().useMock) return require('./mock').updateProfile(data);
     return request('/users/me/profile', {
       method: 'PATCH',
       idempotencyKey: key('profile'),
       data,
     });
+  },
+  getAction(actionId) {
+    if (appConfig().useMock) return require('./mock').getAction(actionId);
+    return request(`/actions/${actionId}`);
+  },
+  getEvidence(actionId) {
+    if (appConfig().useMock) return require('./mock').getEvidence(actionId);
+    return request(`/actions/${actionId}/evidence`);
+  },
+  getTask(taskId) {
+    if (appConfig().useMock) return require('./mock').getTask(taskId);
+    return request(`/tasks/${taskId}`);
+  },
+  getNotificationDiff() {
+    if (appConfig().useMock) return require('./mock').getNotificationDiff();
+    return request('/notifications/diff');
+  },
+  applyNotificationDiff() {
+    if (appConfig().useMock) return require('./mock').applyNotificationDiff();
+    return request('/notifications/diff/apply', { method: 'POST', idempotencyKey: key('notification-diff'), data: { confirmed: true } });
+  },
+  getDemoScenario(name) {
+    if (appConfig().useMock) return require('./mock').getDemoScenario(name);
+    return Promise.resolve({ label: name, source: '' });
   },
 };

@@ -1,0 +1,18 @@
+<view class="page">
+  <view class="eyebrow">EVIDENCE / 04</view>
+  <view class="title">AI 为什么这样判断？</view>
+  <view class="muted">点击字段，查看它在原文中的依据。</view>
+  <view class="evidence-chips"><view class="evidence-chip {{selected === item.evidence_id ? 'selected' : ''}}" wx:for="{{evidence}}" wx:key="evidence_id" bindtap="selectEvidence" data-id="{{item.evidence_id}}"><view class="chip-dot {{item.type}}"></view>{{item.label}}</view></view>
+  <view class="card source-card">
+    <view class="row"><view class="caption">ORIGINAL NOTICE</view><text class="tag blue">已核验</text></view>
+    <view class="source-text">{{sourceText}}</view>
+  </view>
+  <view class="section-title">证据标注 <text class="caption">为什么生成这条行动</text></view>
+  <view class="evidence-list">
+    <view class="evidence-item {{selected === item.evidence_id ? 'selected-item' : ''}}" wx:for="{{evidence}}" wx:key="evidence_id" bindtap="selectEvidence" data-id="{{item.evidence_id}}">
+      <view class="evidence-line"><view class="evidence-index">{{index + 1}}</view><view><view class="caption">{{item.label}}</view><view class="quote">“{{item.source_text}}”</view></view></view>
+      <view class="reason">此行动依据该句生成</view>
+    </view>
+  </view>
+  <view class="danger" wx:if="{{error}}">{{error}}</view>
+</view>

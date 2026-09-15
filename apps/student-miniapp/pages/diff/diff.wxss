@@ -1,0 +1,14 @@
+.update-banner { align-items: center; background: #fffaf1; border-color: #f2d6a5; display: flex; }
+.update-icon { align-items: center; background: #fff0d9; border-radius: 50%; color: #bd6e20; display: flex; font-size: 40rpx; height: 72rpx; justify-content: center; margin-right: 20rpx; width: 72rpx; }
+.update-banner .card-title { font-size: 29rpx; margin: 0 0 5rpx; }
+.diff-field { border-top: 1rpx solid #edf0f5; margin-top: 28rpx; padding-top: 24rpx; }
+.field-label { color: #59647a; font-size: 24rpx; font-weight: 600; }
+.old-value { color: #9ca3b3; font-size: 28rpx; margin-top: 18rpx; text-decoration: line-through; }
+.minus { color: #c34850; margin-right: 12rpx; text-decoration: none; }
+.change-line { align-items: center; display: flex; height: 40rpx; }
+.change-arrow { color: #bd6e20; font-size: 26rpx; margin-right: 10rpx; }
+.line { background: #f0d09e; height: 1rpx; width: 70rpx; }
+.new-value { color: #c34850; font-size: 34rpx; font-weight: 700; }
+.plus { color: #178461; margin-right: 12rpx; }
+.source-quote { color: #59647a; font-size: 25rpx; line-height: 1.8; margin-top: 16rpx; }
+.applied { background: #e6f6f0; border-radius: 16rpx; padding: 24rpx; }

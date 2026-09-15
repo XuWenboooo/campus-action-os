@@ -1,0 +1,10 @@
+.intro { font-size: 30rpx; margin-top: 22rpx; }
+.input-tabs { border-bottom: 1rpx solid #e7eaf2; display: flex; margin-top: 44rpx; }
+.input-tab { color: #98a0b1; padding: 0 24rpx 18rpx 0; margin-right: 26rpx; }
+.input-tab.active { border-bottom: 5rpx solid #3047b8; color: #3047b8; font-weight: 700; }
+.notice-input { margin-top: 0; min-height: 360rpx; padding: 26rpx; }
+.source-hint { color: #59647a; font-size: 24rpx; margin-top: 14rpx; }
+.file-name { padding: 10rpx 0; }
+.sample-title { color: #59647a; font-size: 25rpx; margin-top: 38rpx; }
+.sample-row { display: flex; gap: 14rpx; margin: 16rpx 0 10rpx; }
+.sample-chip { background: #fff; border: 1rpx solid #e1e5ef; border-radius: 14rpx; color: #3047b8; flex: 1; padding: 16rpx 8rpx; text-align: center; }

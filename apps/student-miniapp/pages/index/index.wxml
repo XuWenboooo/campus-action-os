@@ -1,14 +1,38 @@
 <view class="page">
-  <view class="title">今天要做</view>
-  <view class="muted">只展示已经落库的任务；创建任务前必须经过用户确认。</view>
-  <button class="button" bindtap="openImport">导入校园通知</button>
-  <button class="button secondary" bindtap="openTasks">打开任务中心</button>
-  <view class="card" wx:for="{{tasks}}" wx:key="task_id">
-    <view>{{item.title}}</view>
-    <view class="muted">状态：{{item.status}}　截止：{{item.due_at || '未知'}}</view>
+  <view class="eyebrow">CAMPUS ACTION OS</view>
+  <view class="title">校园行动 OS</view>
+  <view class="muted">今天，你只需要关注这些。</view>
+  <view class="hero-stats">
+    <view class="stat"><view class="stat-number">{{todayTasks.length}}</view><view class="caption">今天需要完成</view></view>
+    <view class="stat"><view class="stat-number">{{upcomingTasks.length + 3}}</view><view class="caption">未来 3 天</view></view>
+    <view class="stat alert"><view class="stat-number">{{changedTasks.length}}</view><view class="caption">发生变化</view></view>
   </view>
-  <view class="card" wx:if="{{!tasks.length}}">还没有任务，可以先导入一条通知。</view>
-  <button class="button secondary" bindtap="openProfile">用户画像</button>
-  <button class="button secondary" bindtap="openSettings">设置与隐私</button>
+  <view class="section-title">Today <text class="caption">今天</text></view>
+  <view class="card action-card" wx:for="{{todayTasks}}" wx:key="task_id" bindtap="openTask" data-id="{{item.task_id}}">
+    <view class="row"><text class="tag orange">待完成</text><text class="caption">{{item.source}}</text></view>
+    <view class="card-title">{{item.title}}</view>
+    <view class="deadline">{{item.due_display}}</view>
+    <view class="meta-row"><text>⌁ {{item.platform}}</text><text>查看行动 →</text></view>
+  </view>
+  <view class="empty card" wx:if="{{!todayTasks.length}}">今天没有待办，做得很好。</view>
+  <view class="section-title">Upcoming <text class="caption">接下来</text></view>
+  <view class="card compact-card" wx:for="{{upcomingTasks}}" wx:key="task_id" bindtap="openTask" data-id="{{item.task_id}}">
+    <view class="row"><view class="card-title">{{item.title}}</view><text class="tag blue">{{item.due_display}}</text></view>
+    <view class="source">{{item.platform}} · {{item.source}}</view>
+  </view>
+  <view class="section-title">Changed <text class="caption">有变化</text></view>
+  <view class="card change-card" wx:for="{{changedTasks}}" wx:key="task_id" bindtap="openDiff">
+    <view class="row"><text class="tag red">通知有更新</text><text class="caption">刚刚发现</text></view>
+    <view class="card-title">{{item.title}}</view>
+    <view class="diff-preview"><text class="strike">09-15 23:59</text><text class="arrow">→</text><text class="new-date">09-18 23:59</text></view>
+    <view class="source">查看变化依据 →</view>
+  </view>
+  <view class="section-title">Try a scenario <text class="caption">现场演示</text></view>
+  <view class="demo-row">
+    <view class="demo-chip" bindtap="openDemo" data-scenario="student"><text class="demo-icon">01</text><text>学籍核验</text></view>
+    <view class="demo-chip" bindtap="openDemo" data-scenario="scholarship"><text class="demo-icon">02</text><text>奖学金</text></view>
+    <view class="demo-chip" bindtap="openDemo" data-scenario="extension"><text class="demo-icon">03</text><text>延期通知</text></view>
+  </view>
   <view class="danger" wx:if="{{error}}">{{error}}</view>
+  <view class="bottom-bar"><button class="button" bindtap="openImport">＋ 导入通知</button></view>
 </view>

@@ -1,7 +1,12 @@
 <view class="page">
-  <view class="title">用户画像</view>
-  <view class="muted">画像只用于相关性匹配；当前为本地开发登录。</view>
-  <input value="{{educationLevel}}" placeholder="教育阶段，例如：本科生" bindinput="onEducationInput" />
+  <view class="eyebrow">PROFILE</view>
+  <view class="title">你的学生画像</view>
+  <view class="muted">它帮助我们判断一条通知是否真的与你有关。</view>
+  <view class="profile-summary card"><view class="avatar">CA</view><view><view class="card-title">示例大学 · 计算机学院</view><view class="muted">2026届 · 本科 · 在校学生</view></view></view>
+  <view class="section-title">培养层次</view>
+  <input value="{{educationLevel}}" placeholder="例如：本科" bindinput="onEducationInput" />
+  <view class="section-title">匹配依据</view>
+  <view class="tag-row"><text class="tag blue">2026届</text><text class="tag blue">本科</text><text class="tag blue">计算机学院</text></view>
   <button class="button" loading="{{loading}}" bindtap="save">保存画像</button>
   <view class="danger" wx:if="{{error}}">{{error}}</view>
 </view>

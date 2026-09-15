@@ -1,24 +1,15 @@
 <view class="page">
-  <view class="title">解析结果</view>
-  <view class="card" wx:if="{{job}}">
-    <view>任务状态：{{job.status}}</view>
-    <view class="muted">ParseJob：{{job.parse_job_id}}</view>
-    <view class="danger" wx:if="{{job.error}}">{{job.error.code}}：{{job.error.message}}</view>
+  <view class="eyebrow">ACTION COMPILER / 02</view>
+  <view class="title">正在理解这条通知</view>
+  <view class="muted">不是简单摘要，而是把信息编译成你的行动。</view>
+  <view class="compiler-card card">
+    <view class="compiler-orbit"><view class="orbit-dot"></view></view>
+    <view class="compiler-label">ACTION COMPILER</view>
+    <view class="loading-steps">
+      <view class="loading-step" wx:for="{{steps}}" wx:key="label"><text class="step-mark {{item.done ? 'done' : ''}} {{item.active ? 'active' : ''}}">{{item.done ? '✓' : item.active ? '·' : '○'}}</text><text class="{{item.active ? 'step-active' : ''}}">{{item.label}}</text></view>
+    </view>
   </view>
-  <view class="card" wx:if="{{assessment}}">
-    <view>与你是否相关：{{assessment.user_relevance}}</view>
-    <view class="muted">{{assessment.relevance_reason}}</view>
-  </view>
-  <view class="card" wx:for="{{actions}}" wx:key="action_id">
-    <view>{{item.title}}</view>
-    <view>截止：{{item.deadline.value || '未知，需确认'}}</view>
-    <view>核验状态：{{item.verification_status}}</view>
-    <view wx:for="{{item.evidence}}" wx:key="evidence_id" class="muted">证据：{{item.source_text}}</view>
-    <button class="button" bindtap="confirm" data-id="{{item.action_id}}">确认并创建任务</button>
-    <button class="button secondary" bindtap="reject" data-id="{{item.action_id}}">拒绝此行动</button>
-  </view>
-  <view class="card" wx:if="{{!actions.length && !job.error && !resultReady}}">正在等待解析结果……</view>
-  <view class="card" wx:if="{{!actions.length && !job.error && resultReady}}">解析已完成，但没有发现可展示的行动。</view>
+  <view class="card error-card" wx:if="{{job.error}}"><view class="danger">解析遇到问题</view><view class="muted">{{job.error.message}}</view></view>
   <view class="card" wx:if="{{canManual}}">
     <view class="title">解析失败后的人工建任务</view>
     <view class="muted">没有可靠的解析结果。只有你点击确认后，才会把自定义标题和截止时间落库。</view>

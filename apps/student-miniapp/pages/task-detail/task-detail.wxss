@@ -1,0 +1,7 @@
+.status-row { margin-bottom: 16rpx; }
+.task-title { font-size: 42rpx; margin-top: 20rpx; }
+.deadline-card { background: #fff1f2; border-radius: 20rpx; margin-top: 30rpx; padding: 26rpx 30rpx; }
+.body-copy { color: #394255; font-size: 29rpx; line-height: 1.8; margin-top: 14rpx; }
+.evidence-link { color: #3047b8; font-size: 26rpx; font-weight: 600; margin-top: 24rpx; }
+.history { color: #59647a; display: grid; font-size: 26rpx; grid-template-columns: 1fr auto; row-gap: 22rpx; }
+.history-dot { background: #3047b8; border-radius: 50%; display: inline-block; height: 12rpx; margin-right: 12rpx; width: 12rpx; }

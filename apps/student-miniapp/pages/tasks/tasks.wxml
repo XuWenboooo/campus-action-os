@@ -1,17 +1,11 @@
 <view class="page">
-  <view class="title">任务列表</view>
+  <view class="eyebrow">ALL ACTIONS</view>
+  <view class="title">全部任务</view>
+  <view class="muted">每个任务都来自一条可回溯的校园通知。</view>
   <view class="card" wx:for="{{tasks}}" wx:for-item="task" wx:for-index="index" wx:key="task_id">
-    <view>{{task.title}}</view>
-    <view class="muted">{{task.status}} · {{task.due_at || '无明确截止时间'}}</view>
+    <view bindtap="openTask" data-id="{{task.task_id}}"><view class="row"><text class="tag {{task.status === 'completed' ? 'green' : task.status === 'changed' ? 'red' : 'orange'}}">{{task.status === 'completed' ? '已完成' : task.status === 'changed' ? '有更新' : '待完成'}}</text><text class="caption">{{task.source}}</text></view><view class="list-title">{{task.title}}</view><view class="deadline">{{task.due_display || task.due_at || '待确认'}}</view><view class="source">{{task.platform}} · 查看详情 →</view></view>
+    <button wx:if="{{task.status === 'changed'}}" class="button secondary" bindtap="openDiff">查看通知变化</button>
     <button wx:if="{{task.status === 'pending' || task.status === 'in_progress'}}" class="button" loading="{{loadingTaskId === task.task_id}}" disabled="{{loadingTaskId === task.task_id}}" bindtap="completeTask" data-index="{{index}}">确认完成任务</button>
-    <input value="{{task.noticeIdInput}}" placeholder="已发布通知 ID（可选）" data-index="{{index}}" bindinput="onNoticeInput" />
-    <button class="button secondary" bindtap="linkNotice" data-index="{{index}}">关联通知变更</button>
-    <view class="notice-sync" wx:for="{{task.pendingSync}}" wx:for-item="sync" wx:key="sync_event_id">
-      <view class="warning">待确认通知变更：{{sync.change_type}}</view>
-      <view class="muted">{{sync.reason}}</view>
-      <button class="button" bindtap="resolveSync" data-task-id="{{task.task_id}}" data-event-id="{{sync.sync_event_id}}" data-decision="accept">接受变更</button>
-      <button class="button secondary" bindtap="resolveSync" data-task-id="{{task.task_id}}" data-event-id="{{sync.sync_event_id}}" data-decision="reject">拒绝变更</button>
-    </view>
   </view>
   <view class="card" wx:if="{{!tasks.length}}">暂无任务。</view>
   <view class="danger" wx:if="{{error}}">{{error}}</view>

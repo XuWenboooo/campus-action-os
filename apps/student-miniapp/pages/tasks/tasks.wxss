@@ -1,0 +1,2 @@
+.list-title { font-size: 32rpx; font-weight: 700; margin-top: 18rpx; }
+.card .deadline { margin-top: 12rpx; }

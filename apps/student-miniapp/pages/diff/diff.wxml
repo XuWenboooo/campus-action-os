@@ -1,0 +1,14 @@
+<view class="page">
+  <view class="eyebrow">LIVING ACTION / 06</view>
+  <view class="title">通知发生了变化</view>
+  <view class="muted">我们发现这条通知更新了你的行动。</view>
+  <view class="card update-banner"><view class="update-icon">↻</view><view><view class="card-title">你的任务需要同步</view><view class="muted">确认后，行动中心会使用最新版本。</view></view></view>
+  <view class="card" wx:if="{{diff}}">
+    <view class="caption">{{diff.title}}</view>
+    <view class="diff-field" wx:for="{{diff.fields}}" wx:key="label"><view class="field-label">{{item.label}}</view><view class="old-value"><text class="minus">−</text>{{item.oldValue}}</view><view class="change-line"><text class="change-arrow">↓</text><view class="line"></view></view><view class="new-value"><text class="plus">＋</text>{{item.newValue}}</view></view>
+  </view>
+  <view class="card source-card" wx:if="{{diff}}"><view class="caption">更新来源</view><view class="source-quote">“{{diff.source}}”</view><view class="evidence-link" bindtap="openEvidence">查看原文变化 →</view></view>
+  <view class="success applied" wx:if="{{applied}}">✓ 任务已同步更新，截止时间已变为 9 月 18 日 23:59</view>
+  <view class="danger" wx:if="{{error}}">{{error}}</view>
+  <view class="bottom-bar" wx:if="{{!applied}}"><button class="button" loading="{{applying}}" disabled="{{applying}}" bindtap="apply">更新我的任务</button><button class="button ghost" bindtap="openEvidence">查看原文变化</button></view>
+</view>

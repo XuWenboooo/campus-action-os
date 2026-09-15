@@ -1,0 +1,19 @@
+.hero-stats { background: #202d72; border-radius: 24rpx; color: #fff; display: flex; justify-content: space-between; margin-top: 36rpx; padding: 32rpx 28rpx; }
+.stat { flex: 1; border-right: 1rpx solid rgba(255,255,255,.18); padding-left: 18rpx; }
+.stat:last-child { border: 0; }
+.stat-number { font-size: 48rpx; font-weight: 700; }
+.stat .caption { color: rgba(255,255,255,.68); }
+.stat.alert .stat-number { color: #ffba76; }
+.card-title { font-size: 32rpx; font-weight: 700; margin-top: 20rpx; }
+.meta-row { color: #7a8498; display: flex; font-size: 24rpx; justify-content: space-between; margin-top: 22rpx; }
+.compact-card { padding: 24rpx 28rpx; }
+.compact-card .card-title { margin: 0; font-size: 29rpx; }
+.change-card { border-left: 6rpx solid #d9656e; }
+.diff-preview { align-items: center; display: flex; font-size: 26rpx; margin-top: 20rpx; }
+.strike { color: #9ca3b3; text-decoration: line-through; }
+.arrow { color: #a2a9b8; margin: 0 14rpx; }
+.new-date { color: #c34850; font-weight: 700; }
+.demo-row { display: flex; gap: 16rpx; }
+.demo-chip { align-items: center; background: #fff; border: 1rpx solid #e9ecf3; border-radius: 18rpx; display: flex; flex: 1; flex-direction: column; font-size: 23rpx; padding: 20rpx 8rpx; }
+.demo-icon { align-items: center; background: #eaf0ff; border-radius: 12rpx; color: #3047b8; display: flex; font-weight: 700; height: 52rpx; justify-content: center; margin-bottom: 10rpx; width: 52rpx; }
+.empty { color: #7a8498; text-align: center; }

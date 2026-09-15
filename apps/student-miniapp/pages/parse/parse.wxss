@@ -1,0 +1,12 @@
+.compiler-card { align-items: center; display: flex; flex-direction: column; margin-top: 48rpx; padding: 42rpx 32rpx; }
+.compiler-orbit { align-items: center; border: 2rpx solid #dce3ff; border-radius: 50%; display: flex; height: 130rpx; justify-content: center; position: relative; width: 130rpx; }
+.compiler-orbit:before { border: 2rpx solid #aebcf5; border-radius: 50%; content: ''; height: 88rpx; position: absolute; width: 88rpx; }
+.orbit-dot { background: #3047b8; border-radius: 50%; box-shadow: 0 0 0 12rpx #eaf0ff; height: 20rpx; width: 20rpx; }
+.compiler-label { color: #3047b8; font-size: 22rpx; font-weight: 700; letter-spacing: 3rpx; margin: 26rpx 0; }
+.loading-steps { align-self: stretch; border-top: 1rpx solid #edf0f5; padding-top: 18rpx; }
+.loading-step { color: #a1a9b8; display: flex; font-size: 27rpx; padding: 11rpx 0; }
+.step-mark { color: #b7bfce; font-size: 28rpx; margin-right: 16rpx; width: 28rpx; }
+.step-mark.done { color: #178461; }
+.step-mark.active { color: #3047b8; font-size: 40rpx; line-height: 22rpx; }
+.step-active { color: #3047b8; font-weight: 700; }
+.error-card { border-left: 6rpx solid #c34850; }

@@ -28,6 +28,8 @@ Page({
       .then((tasks) => this.setData({ tasks, error: '' }))
       .catch(() => this.setData({ error: '任务加载失败。' }));
   },
+  openTask(event) { wx.navigateTo({ url: `/pages/task-detail/task-detail?taskId=${event.currentTarget.dataset.id}` }); },
+  openDiff() { wx.navigateTo({ url: '/pages/diff/diff' }); },
   onNoticeInput(event) {
     const index = event.currentTarget.dataset.index;
     this.setData({ [`tasks[${index}].noticeIdInput`]: event.detail.value });

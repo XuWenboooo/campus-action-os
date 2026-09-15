@@ -3,15 +3,19 @@
     "pages/index/index",
     "pages/import/import",
     "pages/parse/parse",
+    "pages/action-result/action-result",
+    "pages/evidence/evidence",
+    "pages/task-detail/task-detail",
+    "pages/diff/diff",
     "pages/tasks/tasks",
     "pages/profile/profile",
     "pages/settings/settings"
   ],
   "window": {
     "navigationBarTitleText": "Campus Action OS",
-    "navigationBarBackgroundColor": "#0f172a",
-    "navigationBarTextStyle": "white",
-    "backgroundColor": "#f8fafc"
+    "navigationBarBackgroundColor": "#f6f7fb",
+    "navigationBarTextStyle": "black",
+    "backgroundColor": "#f6f7fb"
   },
   "style": "v2",
   "sitemapLocation": "sitemap.json"

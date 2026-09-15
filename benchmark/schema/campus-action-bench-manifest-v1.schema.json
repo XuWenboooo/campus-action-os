@@ -55,12 +55,39 @@
     "sample_registry": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["path", "sha256", "bytes", "record_count"],
+      "required": ["path", "sha256", "bytes", "record_count", "records"],
       "properties": {
         "path": {"type": "string", "minLength": 1},
         "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
         "bytes": {"type": "integer", "minimum": 1},
-        "record_count": {"const": 800}
+        "record_count": {"const": 800},
+        "records": {
+          "type": "array",
+          "minItems": 800,
+          "maxItems": 800,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["sample_id", "split", "data_origin", "document_sha256", "authorization_status", "deidentification_status", "annotation_a_status", "annotation_b_status", "adjudication_status", "gold_status", "evidence_status", "source_category", "duplicate_family_id", "revision_family_id", "external_review_status"],
+            "properties": {
+              "sample_id": {"type": "string", "pattern": "^CABV1-[A-Z0-9-]+$"},
+              "split": {"enum": ["train", "dev", "test"]},
+              "data_origin": {"enum": ["real", "reconstructed"]},
+              "document_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+              "authorization_status": {"const": "AUTHORIZED"},
+              "deidentification_status": {"const": "APPROVED"},
+              "annotation_a_status": {"const": "LOCKED"},
+              "annotation_b_status": {"const": "LOCKED"},
+              "adjudication_status": {"const": "ADJUDICATED"},
+              "gold_status": {"const": "VALIDATED"},
+              "evidence_status": {"const": "VALIDATED"},
+              "source_category": {"type": "string", "minLength": 1},
+              "duplicate_family_id": {"type": "string", "minLength": 1},
+              "revision_family_id": {"type": ["string", "null"]},
+              "external_review_status": {"const": "NONE"}
+            }
+          }
+        }
       }
     },
     "quality": {

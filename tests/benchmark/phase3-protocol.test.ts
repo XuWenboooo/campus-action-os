@@ -18,6 +18,23 @@ function hash(char: string): string {
 }
 
 function manifest() {
+  const registryRecords = Array.from({ length: 800 }, (_, index) => ({
+    sample_id: `CABV1-MANIFEST-${String(index + 1).padStart(3, '0')}`,
+    split: index < 480 ? 'train' : index < 640 ? 'dev' : 'test',
+    data_origin: 'reconstructed',
+    document_sha256: hash('e'),
+    authorization_status: 'AUTHORIZED',
+    deidentification_status: 'APPROVED',
+    annotation_a_status: 'LOCKED',
+    annotation_b_status: 'LOCKED',
+    adjudication_status: 'ADJUDICATED',
+    gold_status: 'VALIDATED',
+    evidence_status: 'VALIDATED',
+    source_category: 'academic',
+    duplicate_family_id: `duplicate-family-${index + 1}`,
+    revision_family_id: null,
+    external_review_status: 'NONE',
+  }));
   return {
     manifest_version: 'campus-action-bench-manifest/v1',
     dataset_id: 'CampusActionBench-800',
@@ -38,6 +55,7 @@ function manifest() {
       sha256: hash('d'),
       bytes: 100,
       record_count: 800,
+      records: registryRecords,
     },
     quality: {
       authorized: 800,

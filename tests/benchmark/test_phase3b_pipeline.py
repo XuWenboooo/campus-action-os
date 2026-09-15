@@ -107,6 +107,28 @@ class Phase3BPipelineTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             MODULE.plan_batches([['not-an-object']], 25)
 
+    def test_formal_manifest_freeze_refuses_incomplete_registry(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            registry = root / 'sample-registry.jsonl'
+            output = root / 'manifest.json'
+            registry.write_text('', encoding='utf-8')
+            with self.assertRaisesRegex(ValueError, 'requires exactly 800'):
+                MODULE.build_formal_manifest(
+                    registry_path=registry,
+                    split_paths={'train': registry, 'dev': registry, 'test': registry},
+                    leakage_path=registry,
+                    seal_path=registry,
+                    config_path=registry,
+                    output_path=output,
+                    dataset_version='1.0.0',
+                    code_commit='a' * 40,
+                    reviewers=['person-a', 'person-b'],
+                    frozen_at='2026-09-15T00:00:00Z',
+                    root=root,
+                )
+            self.assertFalse(output.exists())
+
 
 if __name__ == '__main__':
     unittest.main()

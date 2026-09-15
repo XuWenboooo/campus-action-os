@@ -77,12 +77,19 @@ class BenchmarkToolsTest(unittest.TestCase):
     def test_manifest_validator_enforces_formal_counts(self):
         with tempfile.TemporaryDirectory() as td:
             td=Path(td); manifest=td/'manifest.json'
+            registry_records=[{
+                'sample_id':f'CABV1-MANIFEST-{index:03d}', 'split':'train' if index <= 480 else 'dev' if index <= 640 else 'test', 'data_origin':'reconstructed',
+                'document_sha256':'e'*64, 'authorization_status':'AUTHORIZED', 'deidentification_status':'APPROVED',
+                'annotation_a_status':'LOCKED', 'annotation_b_status':'LOCKED', 'adjudication_status':'ADJUDICATED',
+                'gold_status':'VALIDATED', 'evidence_status':'VALIDATED', 'source_category':'academic',
+                'duplicate_family_id':f'duplicate-family-{index}', 'revision_family_id':None, 'external_review_status':'NONE',
+            } for index in range(1,801)]
             value={
                 'manifest_version':'campus-action-bench-manifest/v1',
                 'dataset_id':'CampusActionBench-800','dataset_version':'1.0.0','status':'candidate','total_samples':800,
                 'splits':{'train':480,'dev':160,'test':160},
                 'files':[{'split':split,'path':f'controlled/{split}.jsonl','sha256':'a'*64,'bytes':1,'record_count':480 if split=='train' else 160,'read_only':True} for split in ('train','dev','test')],
-                'sample_registry':{'path':'controlled/sample-registry.jsonl','sha256':'d'*64,'bytes':1,'record_count':800},
+                'sample_registry':{'path':'controlled/sample-registry.jsonl','sha256':'d'*64,'bytes':1,'record_count':800,'records':registry_records},
                 'quality':{'authorized':800,'deidentified':800,'annotation_a':800,'annotation_b':800,'adjudicated':800,'gold_validated':800,'evidence_validated':800,'pending_external_review':0},
                 'protocols':{'dataset':'campus-action-bench-protocol/v1.0.0','annotation':'campus-action-bench-annotation/v1.0.0','evidence':'campus-action-bench-evidence/v1.0.0','split':'campus-action-bench-split/v1.0.0','evaluator':'campus-action-bench-evaluator/v1.0.0','critical_errors':'campus-action-bench-critical-errors/v1.0.0'},
                 'leakage_audit':{'tool':'cab.py','tool_version':'cab/2.0.0','passed':True,'exact_duplicates':0,'near_duplicates':0,'cross_source_groups':0,'reviewer_ids':['p1','p2']},

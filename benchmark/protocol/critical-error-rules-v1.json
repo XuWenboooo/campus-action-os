@@ -1,0 +1,25 @@
+{
+  "protocol_version": "campus-action-bench-critical-errors/v1.0.0",
+  "severity": "critical",
+  "rules": [
+    {"code":"FABRICATED_DEADLINE","when":"prediction.deadline is explicit and gold.deadline is unknown or no valid evidence supports it","denominator":"sample"},
+    {"code":"DEADLINE_BOUNDARY_EXPANSION","when":"prediction changes the source boundary, timezone, or precision of a deadline","denominator":"sample"},
+    {"code":"AUDIENCE_SCOPE_ERROR","when":"prediction expands, reverses, or ignores a gold audience inclusion/exclusion condition","denominator":"sample"},
+    {"code":"UNSUPPORTED_MATERIAL","when":"prediction marks a material required without a gold requirement and valid evidence","denominator":"sample"},
+    {"code":"FABRICATED_PLATFORM","when":"prediction adds a platform or entry point absent from gold and valid evidence","denominator":"sample"},
+    {"code":"MERGED_DEADLINES","when":"prediction merges two or more distinct gold stage/action deadlines","denominator":"sample"},
+    {"code":"CONDITION_DROPPED","when":"prediction removes a gold condition or exception from an action","denominator":"sample"},
+    {"code":"RECOMMENDATION_AS_REQUIREMENT","when":"prediction converts a recommendation, option, or reminder into a required action","denominator":"sample"},
+    {"code":"POSSIBILITY_AS_CERTAINTY","when":"prediction converts a possibility or unresolved uncertainty into a certain fact","denominator":"sample"},
+    {"code":"CONFLICT_AS_CERTAINTY","when":"prediction emits a certain action/deadline while the gold source conflict remains unresolved","denominator":"sample"},
+    {"code":"REVOKED_ACTION_ACTIVE","when":"prediction keeps a revoked or superseded action active","denominator":"sample"}
+  ],
+  "product_error_shield_mapping": {
+    "MISSING_EVIDENCE": "UNSUPPORTED_MATERIAL",
+    "UNSUPPORTED_CLAIM": "FABRICATED_DEADLINE",
+    "DEADLINE_UNSAFE": "FABRICATED_DEADLINE",
+    "CONFLICTING_STATE": "CONFLICT_AS_CERTAINTY",
+    "DANGLING_REFERENCE": "UNSUPPORTED_MATERIAL",
+    "TASK_SIDE_EFFECT_BLOCKED": "CONDITION_DROPPED"
+  }
+}

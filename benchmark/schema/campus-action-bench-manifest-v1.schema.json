@@ -1,0 +1,103 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://campus-action-os.local/benchmark/campus-action-bench-manifest-v1.schema.json",
+  "title": "CampusActionBench-800 formal dataset manifest v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "manifest_version",
+    "dataset_id",
+    "dataset_version",
+    "status",
+    "total_samples",
+    "splits",
+    "files",
+    "protocols",
+    "leakage_audit",
+    "freeze"
+  ],
+  "properties": {
+    "manifest_version": {"const": "campus-action-bench-manifest/v1"},
+    "dataset_id": {"const": "CampusActionBench-800"},
+    "dataset_version": {"type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$"},
+    "status": {"enum": ["candidate", "frozen"]},
+    "total_samples": {"const": 800},
+    "splits": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["train", "dev", "test"],
+      "properties": {
+        "train": {"const": 480},
+        "dev": {"const": 160},
+        "test": {"const": 160}
+      }
+    },
+    "files": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["split", "path", "sha256", "bytes", "record_count", "read_only"],
+        "properties": {
+          "split": {"enum": ["train", "dev", "test"]},
+          "path": {"type": "string", "minLength": 1},
+          "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+          "bytes": {"type": "integer", "minimum": 1},
+          "record_count": {"type": "integer", "minimum": 1},
+          "read_only": {"const": true}
+        }
+      }
+    },
+    "protocols": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["dataset", "annotation", "evidence", "split", "evaluator", "critical_errors"],
+      "properties": {
+        "dataset": {"const": "campus-action-bench-protocol/v1.0.0"},
+        "annotation": {"const": "campus-action-bench-annotation/v1.0.0"},
+        "evidence": {"const": "campus-action-bench-evidence/v1.0.0"},
+        "split": {"const": "campus-action-bench-split/v1.0.0"},
+        "evaluator": {"const": "campus-action-bench-evaluator/v1.0.0"},
+        "critical_errors": {"const": "campus-action-bench-critical-errors/v1.0.0"}
+      }
+    },
+    "leakage_audit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "tool",
+        "tool_version",
+        "passed",
+        "exact_duplicates",
+        "near_duplicates",
+        "cross_source_groups",
+        "reviewer_ids"
+      ],
+      "properties": {
+        "tool": {"const": "cab.py"},
+        "tool_version": {"const": "cab/2.0.0"},
+        "passed": {"const": true},
+        "exact_duplicates": {"const": 0},
+        "near_duplicates": {"const": 0},
+        "cross_source_groups": {"const": 0},
+        "reviewer_ids": {"type": "array", "minItems": 2, "uniqueItems": true, "items": {"type": "string", "minLength": 1}}
+      }
+    },
+    "freeze": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code_commit", "config_sha256", "frozen_at", "manifest_sha256", "reviewer_ids", "test_read_only"],
+      "properties": {
+        "code_commit": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+        "config_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "frozen_at": {"type": "string", "format": "date-time"},
+        "manifest_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "reviewer_ids": {"type": "array", "minItems": 2, "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+        "test_read_only": {"const": true}
+      }
+    },
+    "notes": {"type": "array", "items": {"type": "string"}}
+  }
+}

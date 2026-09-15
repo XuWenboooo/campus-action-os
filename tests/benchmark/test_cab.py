@@ -52,4 +52,55 @@ class BenchmarkToolsTest(unittest.TestCase):
             self.assertNotEqual(r.returncode,0)
             self.assertTrue(any('schema validation failed' in item for item in report['errors']))
 
+    def test_formal_split_refuses_to_invent_missing_samples(self):
+        with tempfile.TemporaryDirectory() as td:
+            result=run('split',SAMPLE,'--out-dir',Path(td)/'splits','--seed',20260915,'--formal')
+            self.assertNotEqual(result.returncode,0)
+            self.assertIn('formal split requires 800 samples',result.stderr)
+
+    def test_leakage_audit_detects_cross_split_exact_and_near_duplicates(self):
+        with tempfile.TemporaryDirectory() as td:
+            td=Path(td)
+            rows=SAMPLE.read_text(encoding='utf-8').splitlines()
+            train=td/'train.jsonl'; dev=td/'dev.jsonl'; test=td/'test.jsonl'
+            train.write_text(rows[0]+'\n',encoding='utf-8')
+            duplicate=json.loads(rows[0]); duplicate['sample_id']='CABV1-SYN-003'; duplicate['source_group']='fictional-gamma'
+            dev.write_text(json.dumps(duplicate,ensure_ascii=False)+'\n',encoding='utf-8')
+            near=json.loads(rows[1]); near['sample_id']='CABV1-SYN-004'; near['source_group']='fictional-delta'; near['raw_input']['ocr_text']=near['raw_input']['ocr_text']+' 请确认。'
+            test.write_text(json.dumps(near,ensure_ascii=False)+'\n',encoding='utf-8')
+            result=run('leakage','--train',train,'--dev',dev,'--test',test)
+            report=json.loads(result.stdout)
+            self.assertNotEqual(result.returncode,0)
+            self.assertFalse(report['passed'])
+            self.assertTrue(report['exact_duplicates'])
+
+    def test_manifest_validator_enforces_formal_counts(self):
+        with tempfile.TemporaryDirectory() as td:
+            td=Path(td); manifest=td/'manifest.json'
+            value={
+                'manifest_version':'campus-action-bench-manifest/v1',
+                'dataset_id':'CampusActionBench-800','dataset_version':'1.0.0','status':'candidate','total_samples':800,
+                'splits':{'train':480,'dev':160,'test':160},
+                'files':[{'split':split,'path':f'controlled/{split}.jsonl','sha256':'a'*64,'bytes':1,'record_count':480 if split=='train' else 160,'read_only':True} for split in ('train','dev','test')],
+                'protocols':{'dataset':'campus-action-bench-protocol/v1.0.0','annotation':'campus-action-bench-annotation/v1.0.0','evidence':'campus-action-bench-evidence/v1.0.0','split':'campus-action-bench-split/v1.0.0','evaluator':'campus-action-bench-evaluator/v1.0.0','critical_errors':'campus-action-bench-critical-errors/v1.0.0'},
+                'leakage_audit':{'tool':'cab.py','tool_version':'cab/2.0.0','passed':True,'exact_duplicates':0,'near_duplicates':0,'cross_source_groups':0,'reviewer_ids':['p1','p2']},
+                'freeze':{'code_commit':'a'*40,'config_sha256':'b'*64,'frozen_at':'2026-09-15T00:00:00Z','manifest_sha256':'c'*64,'reviewer_ids':['p1','p2'],'test_read_only':True},
+            }
+            manifest.write_text(json.dumps(value),encoding='utf-8')
+            self.assertEqual(run('validate-manifest',manifest).returncode,0)
+            value['splits']['test']=159; manifest.write_text(json.dumps(value),encoding='utf-8')
+            self.assertNotEqual(run('validate-manifest',manifest).returncode,0)
+
+    def test_formal_audit_requires_independent_submissions_and_adjudication_record(self):
+        sample=json.loads(SAMPLE.read_text(encoding='utf-8').splitlines()[0])
+        sample['provenance']={'source_type':'authorized_reconstructed','authorization_status':'documented','data_origin':'reconstructed'}
+        sample['annotation']={'annotator_ids':['ann-a','ann-b'],'adjudication_status':'adjudicated','adjudicator_id':'ann-c'}
+        with tempfile.TemporaryDirectory() as td:
+            candidate=Path(td)/'candidate.jsonl'; candidate.write_text(json.dumps(sample,ensure_ascii=False)+'\n',encoding='utf-8')
+            result=run('audit',candidate,'--expected')
+            report=json.loads(result.stdout)
+            self.assertNotEqual(result.returncode,0)
+            self.assertTrue(any('independent result hashes' in item for item in report['errors']))
+            self.assertTrue(any('disagreement report' in item for item in report['errors']))
+
 if __name__=='__main__': unittest.main()

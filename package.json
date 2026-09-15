@@ -34,6 +34,7 @@
     "test:db": "node --test --import tsx tests/database/**/*.test.ts",
     "test:fixtures": "node --test --import tsx tests/fixtures/**/*.test.ts",
     "test:evaluation": "node --test --import tsx tests/evaluation/**/*.test.ts",
+    "test:phase3": "node --test --import tsx tests/benchmark/phase3-protocol.test.ts && npm run test:benchmark",
     "evaluate:fixtures": "tsx tools/evaluation/run.ts",
     "start:verify": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/verify-start.ps1",
     "dev:mock": "tsx tools/integration/mock-ai-parser/server.ts",

@@ -19,6 +19,15 @@ python tools/benchmark/phase3b_pipeline.py audit-candidates `
   --out <candidate-audit.json>
 ```
 
+原始候选先通过离线脱敏工具；工具禁止覆盖输入、校验直接标识符和可选的语义锚点，并始终输出 `PENDING/REVIEW_REQUIRED`，必须由 Person A 完成人工语义复核后才能改为 `APPROVED/DEIDENTIFIED`：
+
+```powershell
+python tools/benchmark/phase3b_pipeline.py deidentify-candidates `
+  --input <authorized-raw-candidates.jsonl> `
+  --output <deidentified-review.jsonl> `
+  --report <deidentification-report.json>
+```
+
 完成 A/B 标注、仲裁和证据 QA 后，交付给 freeze gate 的 sample registry 还必须为每条样本记录：`sample_id`、`split`、`data_origin`、`document_sha256`、`authorization_status`、`deidentification_status`、`annotation_a_status`、`annotation_b_status`、`adjudication_status`、`gold_status`、`evidence_status`、`source_category`、`duplicate_family_id`、`revision_family_id` 和 `external_review_status`。这些状态不能由模型预测填充。
 
 ## Annotation batches

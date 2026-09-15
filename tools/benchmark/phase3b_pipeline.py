@@ -20,6 +20,15 @@ DEIDENTIFICATION_STATUSES = {'APPROVED', 'PENDING', 'REJECTED'}
 SAMPLE_ID = re.compile(r'^CABV1-[A-Z0-9-]+$')
 SHA256 = re.compile(r'^[0-9a-f]{64}$')
 DIRECT_IDENTIFIER = re.compile(r'(?:\b1[3-9]\d{9}\b|\b\d{17}[\dXx]\b|手机号|身份证|学号|真实姓名|[\w.+-]+@[\w.-]+\.[A-Za-z]{2,})')
+DEIDENTIFICATION_RULES = (
+    (re.compile(r'\b[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}\b'), '[REDACTED_EMAIL]'),
+    (re.compile(r'\b1[3-9]\d{9}\b'), '[REDACTED_PHONE]'),
+    (re.compile(r'\b\d{17}[\dXx]\b'), '[REDACTED_ID]'),
+    (re.compile(r'(?:姓名|真实姓名)\s*[:：]\s*[^\s,，。；;]{2,20}'), '[REDACTED_NAME]'),
+    (re.compile(r'学号\s*[:：]\s*[^\s,，。；;]{2,30}'), '[REDACTED_STUDENT_ID]'),
+    (re.compile(r'(?:联系方式|私人联系方式|手机号)\s*[:：]\s*[^\s,，。；;]{2,40}'), '[REDACTED_CONTACT]'),
+    (re.compile(r'(?:微信号|QQ号|个人账号)\s*[:：]\s*[^\s,，。；;]{2,40}'), '[REDACTED_ACCOUNT]'),
+)
 REQUIRED_CANDIDATE_FIELDS = (
     'candidate_id',
     'source_type',
@@ -105,6 +114,15 @@ def write_jsonl(path, rows):
 
 def file_digest(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def deidentify_text(text):
+    value = text
+    replacements = 0
+    for pattern, replacement in DEIDENTIFICATION_RULES:
+        value, count = pattern.subn(replacement, value)
+        replacements += count
+    return value, replacements
 
 
 def relative_path(path, root):
@@ -798,6 +816,80 @@ def candidate_errors(row, authorization):
     return errors
 
 
+def deidentify_candidates(input_path, output_path):
+    if input_path.resolve() == output_path.resolve():
+        raise ValueError('de-identification output must not overwrite the input')
+    rows = load_jsonl(input_path)
+    output_rows = []
+    report_rows = []
+    errors = []
+    for line_number, row in rows:
+        if is_parse_error(row):
+            errors.append(f'candidate line {line_number}: invalid JSON')
+            continue
+        if not isinstance(row, dict):
+            errors.append(f'candidate line {line_number}: record must be a JSON object')
+            continue
+        candidate_id = row.get('candidate_id')
+        if not isinstance(candidate_id, str) or not SAMPLE_ID.fullmatch(candidate_id):
+            errors.append(f'candidate line {line_number}: candidate_id must be a stable CABV1-* ID')
+            continue
+        if not isinstance(row.get('data_origin'), str) or row['data_origin'] not in FORMAL_ORIGINS:
+            errors.append(f'{candidate_id}: synthetic data cannot be de-identified into the formal pool')
+            continue
+        raw_input = row.get('raw_input')
+        if not isinstance(raw_input, dict) or not isinstance(raw_input.get('ocr_text'), str) or not raw_input['ocr_text'].strip():
+            errors.append(f'{candidate_id}: raw_input.ocr_text is required')
+            continue
+        before = raw_input['ocr_text']
+        after, replacement_count = deidentify_text(before)
+        if DIRECT_IDENTIFIER.search(after):
+            errors.append(f'{candidate_id}: direct identifier remains after de-identification')
+            continue
+        anchors = row.get('semantic_anchors')
+        semantic_status = 'MANUAL_REVIEW_REQUIRED'
+        missing_anchors = []
+        if isinstance(anchors, list) and anchors:
+            invalid_anchors = [anchor for anchor in anchors if not isinstance(anchor, str) or not anchor.strip()]
+            if invalid_anchors:
+                errors.append(f'{candidate_id}: semantic_anchors must contain non-empty strings')
+                continue
+            missing_anchors = [anchor for anchor in anchors if anchor not in after]
+            semantic_status = 'PASS' if not missing_anchors else 'FAILED'
+            if missing_anchors:
+                errors.append(f'{candidate_id}: semantic anchors disappeared: {", ".join(missing_anchors)}')
+                continue
+        transformed = copy.deepcopy(row)
+        transformed['raw_input']['ocr_text'] = after
+        transformed['privacy_status'] = 'REVIEW_REQUIRED'
+        transformed['deidentification_status'] = 'PENDING'
+        transformed['deidentification_report_id'] = f'{candidate_id}:deidentification'
+        output_rows.append(transformed)
+        report_rows.append({
+            'candidate_id': candidate_id,
+            'status': 'REVIEW_REQUIRED',
+            'replacements': replacement_count,
+            'input_text_sha256': hashlib.sha256(before.encode('utf-8')).hexdigest(),
+            'output_text_sha256': hashlib.sha256(after.encode('utf-8')).hexdigest(),
+            'direct_identifier_check': 'PASS',
+            'semantic_check': semantic_status,
+            'missing_semantic_anchors': missing_anchors,
+            'approval_required': True,
+        })
+    if errors:
+        raise ValueError('de-identification gate blocked: ' + '; '.join(errors[:10]))
+    if not output_rows:
+        raise ValueError('de-identification input contains no formal candidates')
+    write_jsonl(output_path, output_rows)
+    return {
+        'status': 'REVIEW_REQUIRED',
+        'input_count': len(rows),
+        'output_count': len(output_rows),
+        'approved_count': 0,
+        'report': report_rows,
+    }
+
+
 def audit_candidates(input_path, authorization_path):
     authorizations, authorization_errors = load_authorizations(authorization_path)
     rows = load_jsonl(input_path)
@@ -900,6 +992,10 @@ def main():
     assemble_parser.add_argument('--out', required=True, type=Path)
     assemble_parser.add_argument('--disagreement-out', required=True, type=Path)
     assemble_parser.add_argument('--quality-out', required=True, type=Path)
+    deidentify_parser = sub.add_parser('deidentify-candidates')
+    deidentify_parser.add_argument('--input', required=True, type=Path)
+    deidentify_parser.add_argument('--output', required=True, type=Path)
+    deidentify_parser.add_argument('--report', required=True, type=Path)
     args = parser.parse_args()
     if args.command == 'audit-candidates':
         report = audit_candidates(args.input, args.authorization)
@@ -939,6 +1035,11 @@ def main():
             raise ValueError(f'refusing to overwrite existing gold batch: {args.out}')
         write_jsonl(args.out, report['samples'])
         print(json.dumps({'status': 'READY', 'sample_count': len(report['samples']), 'quality': report['quality']}, ensure_ascii=False, indent=2))
+        return 0
+    if args.command == 'deidentify-candidates':
+        report = deidentify_candidates(args.input, args.output)
+        write_json(args.report, report)
+        print(json.dumps(report, ensure_ascii=False, indent=2))
         return 0
     return 2
 

@@ -80,13 +80,15 @@ def annotation(sample_id, annotator_id, workspace_id, relevance='relevant'):
     return value
 
 
-def formal_candidate():
-    return candidate(
+def formal_candidate(**changes):
+    value = candidate(
         source_group='authorized-source-group-001',
         notice_category='academic',
         raw_input={'input_type': 'text', 'ocr_text': '提交课程回顾', 'layout': {'pages': 1, 'blocks': []}},
         user_profile={'profile_id': 'profile-001', 'attributes': {'enrollment': 'student'}},
     )
+    value.update(changes)
+    return value
 
 
 class Phase3BPipelineTest(unittest.TestCase):
@@ -235,6 +237,46 @@ class Phase3BPipelineTest(unittest.TestCase):
             self.assertEqual(report['status'], 'BLOCKED')
             self.assertEqual(report['pending_sample_ids'], [sample['candidate_id']])
             self.assertEqual(report['samples'], [])
+
+    def test_deidentify_candidates_redacts_direct_identifiers_but_requires_manual_approval(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            sample = formal_candidate()
+            sample['raw_input']['ocr_text'] = '姓名：张三 手机号：13812345678 邮箱：zhangsan@example.test 请提交课程回顾'
+            sample['semantic_anchors'] = ['请提交课程回顾']
+            input_path = root / 'raw-candidates.jsonl'
+            output_path = root / 'deidentified-candidates.jsonl'
+            report_path = root / 'deidentification-report.json'
+            self.write_jsonl(input_path, [sample])
+            report = MODULE.deidentify_candidates(input_path, output_path)
+            self.assertEqual(report['status'], 'REVIEW_REQUIRED')
+            self.assertEqual(report['approved_count'], 0)
+            transformed = json.loads(output_path.read_text(encoding='utf-8'))
+            transformed_text = transformed['raw_input']['ocr_text']
+            self.assertNotIn('张三', transformed_text)
+            self.assertNotIn('13812345678', transformed_text)
+            self.assertNotIn('zhangsan@example.test', transformed_text)
+            self.assertIn('请提交课程回顾', transformed_text)
+            self.assertEqual(transformed['deidentification_status'], 'PENDING')
+            self.assertEqual(transformed['privacy_status'], 'REVIEW_REQUIRED')
+            self.assertTrue(report['report'][0]['approval_required'])
+            with self.assertRaises(ValueError):
+                MODULE.deidentify_candidates(input_path, input_path)
+
+    def test_deidentify_candidates_rejects_synthetic_and_lost_semantic_anchors(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            synthetic = formal_candidate(data_origin='synthetic')
+            synthetic_path = root / 'synthetic.jsonl'
+            self.write_jsonl(synthetic_path, [synthetic])
+            with self.assertRaisesRegex(ValueError, 'synthetic'):
+                MODULE.deidentify_candidates(synthetic_path, root / 'out.jsonl')
+            missing_anchor = formal_candidate()
+            missing_anchor['semantic_anchors'] = ['不存在的关键动作']
+            missing_path = root / 'missing-anchor.jsonl'
+            self.write_jsonl(missing_path, [missing_anchor])
+            with self.assertRaisesRegex(ValueError, 'semantic anchors disappeared'):
+                MODULE.deidentify_candidates(missing_path, root / 'missing-output.jsonl')
 
 
 if __name__ == '__main__':

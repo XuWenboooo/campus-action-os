@@ -33,6 +33,22 @@ function manifest() {
       record_count: split === 'train' ? 480 : 160,
       read_only: true,
     })),
+    sample_registry: {
+      path: 'controlled/sample-registry.jsonl',
+      sha256: hash('d'),
+      bytes: 100,
+      record_count: 800,
+    },
+    quality: {
+      authorized: 800,
+      deidentified: 800,
+      annotation_a: 800,
+      annotation_b: 800,
+      adjudicated: 800,
+      gold_validated: 800,
+      evidence_validated: 800,
+      pending_external_review: 0,
+    },
     protocols: {
       dataset: 'campus-action-bench-protocol/v1.0.0',
       annotation: 'campus-action-bench-annotation/v1.0.0',

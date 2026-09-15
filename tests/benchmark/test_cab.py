@@ -82,6 +82,8 @@ class BenchmarkToolsTest(unittest.TestCase):
                 'dataset_id':'CampusActionBench-800','dataset_version':'1.0.0','status':'candidate','total_samples':800,
                 'splits':{'train':480,'dev':160,'test':160},
                 'files':[{'split':split,'path':f'controlled/{split}.jsonl','sha256':'a'*64,'bytes':1,'record_count':480 if split=='train' else 160,'read_only':True} for split in ('train','dev','test')],
+                'sample_registry':{'path':'controlled/sample-registry.jsonl','sha256':'d'*64,'bytes':1,'record_count':800},
+                'quality':{'authorized':800,'deidentified':800,'annotation_a':800,'annotation_b':800,'adjudicated':800,'gold_validated':800,'evidence_validated':800,'pending_external_review':0},
                 'protocols':{'dataset':'campus-action-bench-protocol/v1.0.0','annotation':'campus-action-bench-annotation/v1.0.0','evidence':'campus-action-bench-evidence/v1.0.0','split':'campus-action-bench-split/v1.0.0','evaluator':'campus-action-bench-evaluator/v1.0.0','critical_errors':'campus-action-bench-critical-errors/v1.0.0'},
                 'leakage_audit':{'tool':'cab.py','tool_version':'cab/2.0.0','passed':True,'exact_duplicates':0,'near_duplicates':0,'cross_source_groups':0,'reviewer_ids':['p1','p2']},
                 'freeze':{'code_commit':'a'*40,'config_sha256':'b'*64,'frozen_at':'2026-09-15T00:00:00Z','manifest_sha256':'c'*64,'reviewer_ids':['p1','p2'],'test_read_only':True},

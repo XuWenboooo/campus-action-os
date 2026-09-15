@@ -12,6 +12,8 @@
     "total_samples",
     "splits",
     "files",
+    "sample_registry",
+    "quality",
     "protocols",
     "leakage_audit",
     "freeze"
@@ -48,6 +50,32 @@
           "record_count": {"type": "integer", "minimum": 1},
           "read_only": {"const": true}
         }
+      }
+    },
+    "sample_registry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256", "bytes", "record_count"],
+      "properties": {
+        "path": {"type": "string", "minLength": 1},
+        "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "bytes": {"type": "integer", "minimum": 1},
+        "record_count": {"const": 800}
+      }
+    },
+    "quality": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["authorized", "deidentified", "annotation_a", "annotation_b", "adjudicated", "gold_validated", "evidence_validated", "pending_external_review"],
+      "properties": {
+        "authorized": {"const": 800},
+        "deidentified": {"const": 800},
+        "annotation_a": {"const": 800},
+        "annotation_b": {"const": 800},
+        "adjudicated": {"const": 800},
+        "gold_validated": {"const": 800},
+        "evidence_validated": {"const": 800},
+        "pending_external_review": {"const": 0}
       }
     },
     "protocols": {

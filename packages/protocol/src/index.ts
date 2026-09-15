@@ -223,7 +223,8 @@ export type PublicUserProfile = UserProfile & {
   updated_at: string;
 };
 
-export type DocumentContentType = 'text/plain' | 'image/png' | 'application/pdf' | 'text/html';
+export type DocumentContentType =
+  'text/plain' | 'image/png' | 'image/jpeg' | 'application/pdf' | 'text/html';
 export type DataOrigin = 'synthetic' | 'user_provided';
 export type Document = {
   schema_version: 'document/v1';
@@ -269,7 +270,7 @@ export type Task = {
 
 export type UserDataExportFile = {
   document_id: string;
-  content_type: 'image/png' | 'application/pdf';
+  content_type: 'image/png' | 'image/jpeg' | 'application/pdf';
   byte_length: number;
   content_sha256: string;
   created_at: string;

@@ -1,3 +1,8 @@
 # Python 3.11-3.14; direct M1 test dependencies are intentionally pinned.
 pytest==9.1.1
 jsonschema==4.26.0
+# Phase 2 offline file extraction/OCR runtime; no provider credentials required.
+PyMuPDF==1.28.2
+Pillow==12.3.0
+numpy==2.5.2
+rapidocr_onnxruntime==1.4.4

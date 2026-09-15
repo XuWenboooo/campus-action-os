@@ -57,7 +57,7 @@ components:
             properties:
               title: { type: string }
               text: { type: string }
-              contentType: { enum: [text/plain, text/html, image/png, application/pdf] }
+              contentType: { enum: [text/plain, text/html, image/png, image/jpeg, application/pdf] }
               content_base64:
                 {
                   type: string,

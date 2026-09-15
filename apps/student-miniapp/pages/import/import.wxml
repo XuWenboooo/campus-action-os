@@ -1,8 +1,8 @@
 <view class="page">
   <view class="title">导入校园通知</view>
-  <view class="muted">文字会直接进入解析链路；PNG/PDF 会保留原始文件并交给已配置的 OCR 边界，未配置时不会伪装成解析成功。</view>
+  <view class="muted">文字会直接进入解析链路；PNG/JPEG/PDF 会保留原始文件并交给本地或已配置的 OCR 边界，未配置时不会伪装成解析成功。</view>
   <textarea value="{{text}}" placeholder="粘贴校园通知原文" maxlength="100000" bindinput="onInput" />
-  <button class="button secondary" disabled="{{loading}}" bindtap="chooseFile">选择 PNG/PDF 文件</button>
+  <button class="button secondary" disabled="{{loading}}" bindtap="chooseFile">选择 PNG/JPEG/PDF 文件</button>
   <view class="muted" wx:if="{{fileName}}">已选择：{{fileName}}</view>
   <button class="button" loading="{{loading}}" disabled="{{loading}}" bindtap="submit">开始解析</button>
   <view class="danger" wx:if="{{error}}">{{error}}</view>

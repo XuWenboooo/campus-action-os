@@ -31,6 +31,8 @@ export function migrateDatabase(databasePath = defaultDatabasePath()): DatabaseS
     const version = Number(file.slice(0, file.indexOf('_')));
     if (applied.has(version)) continue;
     const sql = readFileSync(resolve(migrationDirectory, file), 'utf8');
+    const temporarilyDisableForeignKeys = file === '008_allow_jpeg.sql';
+    if (temporarilyDisableForeignKeys) db.exec('PRAGMA foreign_keys = OFF;');
     db.exec('BEGIN');
     try {
       db.exec(sql);
@@ -40,8 +42,13 @@ export function migrateDatabase(databasePath = defaultDatabasePath()): DatabaseS
         new Date().toISOString(),
       );
       db.exec('COMMIT');
+      if (temporarilyDisableForeignKeys) {
+        db.exec('PRAGMA foreign_keys = ON;');
+        db.exec('PRAGMA foreign_key_check;');
+      }
     } catch (error) {
       db.exec('ROLLBACK');
+      if (temporarilyDisableForeignKeys) db.exec('PRAGMA foreign_keys = ON;');
       db.close();
       throw error;
     }

@@ -44,5 +44,6 @@
 - 修正 Windows 启动配置：`start-dev.ps1` 与 `verify-start.ps1` 现在显式绑定 `AI_SERVICE_URL`；启动验证从仅检查健康端点升级为实际执行一次合成 API→AI 解析，并确认监听端口清理。
 - 收紧媒体入口：`/documents` 不再接受没有源字节的图片/PDF 声明，二进制必须经 `/documents/upload`，并新增错误路径回归测试。
 - 增加 `user-data-export/v1` 公共 Schema 和只读 `GET /users/me/export`：导出当前用户画像、原文、完整性校验后的媒体 Base64、ParseJob、Action 与 Task；API、Repository、OpenAPI 和小程序隐私设置均已接入并测试。
+- Phase 2 External Integration：新增统一 `DocumentExtractor`，用 PyMuPDF 提取 PDF 文本层并识别扫描 PDF；新增本地离线 `LocalRapidOcrProvider`，真实处理 synthetic PNG/JPEG 与扫描 PDF；新增 `RuleBasedProvider`、`ExternalProvider`、`FallbackPolicy`，覆盖 timeout、cancellation、rate-limit/retry、malformed/schema-invalid response、requestId、Error Shield 和安全日志；真实文件 E2E 已跑通 upload → extract/OCR → parse → evidence → confirm → task，失败文件保持显式错误。
 
-仍为 `NOT_READY`：真实 OCR/provider、正式 800 条冻结评测、微信开发者工具人工验证、真实认证/提醒和生产部署均缺失；本地测试不能替代这些证据。
+仍未完成：外部 OCR/provider、正式 800 条冻结评测、微信开发者工具人工验证、真实认证/提醒和生产部署均缺失；本地离线 OCR 仅证明 Phase 2 的无凭据开发路径，不替代外部服务或正式科研证据。

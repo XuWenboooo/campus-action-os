@@ -80,7 +80,7 @@ function isoDeadline(line: string | undefined): {
     return { value: null, precision: 'unknown', boundary: 'unknown', ambiguous: Boolean(line) };
   }
   const match = line.match(
-    /(20\d{2})[-年](\d{1,2})[-月](\d{1,2})日?(?:[ T](\d{1,2})[:：](\d{2}))?/,
+    /(20\d{2})[-年](\d{1,2})[-月](\d{1,2})日?(?:[ T]?(\d{1,2})[:：](\d{2}))?/,
   );
   if (!match) return { value: null, precision: 'unknown', boundary: 'unknown', ambiguous: false };
   const [, year, month, day, hour, minute] = match;

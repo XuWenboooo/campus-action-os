@@ -15,7 +15,7 @@ CREATE TABLE IF NOT EXISTS documents (
   document_id TEXT PRIMARY KEY,
   owner_user_id TEXT NOT NULL REFERENCES users(user_id),
   title TEXT NOT NULL,
-  content_type TEXT NOT NULL CHECK (content_type IN ('text/plain', 'image/png', 'application/pdf', 'text/html')),
+  content_type TEXT NOT NULL CHECK (content_type IN ('text/plain', 'image/png', 'image/jpeg', 'application/pdf', 'text/html')),
   text TEXT NOT NULL,
   content_sha256 TEXT NOT NULL,
   data_origin TEXT NOT NULL CHECK (data_origin IN ('synthetic', 'user_provided')),

@@ -316,7 +316,7 @@ export type CreateDocumentInput = {
 
 export type DocumentFile = {
   document_id: string;
-  content_type: 'image/png' | 'application/pdf';
+  content_type: 'image/png' | 'image/jpeg' | 'application/pdf';
   byte_length: number;
   content_sha256: string;
   created_at: string;
@@ -489,12 +489,13 @@ export class Repository {
     if (
       input.sourceContent !== undefined &&
       input.contentType !== 'image/png' &&
+      input.contentType !== 'image/jpeg' &&
       input.contentType !== 'application/pdf'
     )
       throw new RepositoryError(
         'INVALID_DOCUMENT',
         400,
-        'Binary source content is only supported for image/png or application/pdf',
+        'Binary source content is only supported for image/png, image/jpeg, or application/pdf',
       );
     if (input.sourceContent !== undefined && input.sourceContent.byteLength === 0)
       throw new RepositoryError('INVALID_DOCUMENT', 400, 'Binary source content cannot be empty');

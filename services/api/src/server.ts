@@ -110,6 +110,7 @@ function contentType(value: unknown): Document['content_type'] {
   if (
     value === 'text/plain' ||
     value === 'image/png' ||
+    value === 'image/jpeg' ||
     value === 'application/pdf' ||
     value === 'text/html'
   )
@@ -121,14 +122,16 @@ const maxBinaryUploadBytes = 800_000;
 
 function binaryUpload(
   value: unknown,
-  contentTypeValue: 'image/png' | 'application/pdf',
+  contentTypeValue: 'image/png' | 'image/jpeg' | 'application/pdf',
 ): Uint8Array {
-  if (typeof value !== 'string' || value.length === 0 || value.length % 4 !== 0)
+  if (typeof value !== 'string' || value.length % 4 !== 0)
     throw new RepositoryError('INVALID_REQUEST', 400, 'content_base64 must be canonical Base64');
   if (!/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(value))
     throw new RepositoryError('INVALID_REQUEST', 400, 'content_base64 must be canonical Base64');
   const content = Buffer.from(value, 'base64');
-  if (content.byteLength === 0 || content.byteLength > maxBinaryUploadBytes)
+  if (content.byteLength === 0)
+    throw new RepositoryError('EMPTY_FILE', 400, 'Binary upload cannot be empty');
+  if (content.byteLength > maxBinaryUploadBytes)
     throw new RepositoryError(
       'TEXT_TOO_LARGE',
       413,
@@ -139,10 +142,16 @@ function binaryUpload(
   const isPng =
     contentTypeValue === 'image/png' &&
     Buffer.from(content.subarray(0, 8)).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]));
+  const isJpeg =
+    contentTypeValue === 'image/jpeg' &&
+    content.byteLength >= 3 &&
+    content[0] === 0xff &&
+    content[1] === 0xd8 &&
+    content[2] === 0xff;
   const isPdf =
     contentTypeValue === 'application/pdf' &&
     Buffer.from(content.subarray(0, 5)).toString('ascii') === '%PDF-';
-  if (!isPng && !isPdf)
+  if (!isPng && !isJpeg && !isPdf)
     throw new RepositoryError(
       'INVALID_REQUEST',
       400,
@@ -469,18 +478,22 @@ async function handle(
     const documentContentType = contentType(body.contentType);
     if (
       !uploaded &&
-      (documentContentType === 'image/png' || documentContentType === 'application/pdf')
+      (documentContentType === 'image/png' ||
+        documentContentType === 'image/jpeg' ||
+        documentContentType === 'application/pdf')
     )
       throw new RepositoryError(
         'UNSUPPORTED_CONTENT_TYPE',
         415,
-        'image/png and application/pdf documents must use /documents/upload',
+        'image/png, image/jpeg, and application/pdf documents must use /documents/upload',
       );
     let sourceContent: Uint8Array | undefined;
     let text: string | undefined;
     if (
       uploaded &&
-      (documentContentType === 'image/png' || documentContentType === 'application/pdf')
+      (documentContentType === 'image/png' ||
+        documentContentType === 'image/jpeg' ||
+        documentContentType === 'application/pdf')
     ) {
       sourceContent = binaryUpload(body.content_base64, documentContentType);
       text = stringField(body, 'text', false) ?? '';
@@ -489,7 +502,7 @@ async function handle(
         throw new RepositoryError(
           'UNSUPPORTED_CONTENT_TYPE',
           415,
-          'content_base64 uploads require image/png or application/pdf',
+          'content_base64 uploads require image/png, image/jpeg, or application/pdf',
         );
       text = stringField(body, 'text');
     }

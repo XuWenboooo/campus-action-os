@@ -20,15 +20,21 @@ Page({
     wx.chooseMessageFile({
       count: 1,
       type: 'file',
-      extension: ['png', 'pdf'],
+      extension: ['png', 'jpg', 'jpeg', 'pdf'],
       success: (result) => {
         const file = result.tempFiles && result.tempFiles[0];
         const name = (file && file.name) || '';
         const extension = name.toLowerCase().split('.').pop();
         const fileType =
-          extension === 'png' ? 'image/png' : extension === 'pdf' ? 'application/pdf' : '';
+          extension === 'png'
+            ? 'image/png'
+            : extension === 'jpg' || extension === 'jpeg'
+              ? 'image/jpeg'
+              : extension === 'pdf'
+                ? 'application/pdf'
+                : '';
         if (!file || !file.path || !fileType) {
-          this.setData({ error: '只支持 PNG 图片或 PDF 文件。' });
+          this.setData({ error: '只支持 PNG/JPEG 图片或 PDF 文件。' });
           return;
         }
         this.setData({ filePath: file.path, fileName: name, fileType, error: '' });
@@ -47,7 +53,7 @@ Page({
   },
   submit() {
     if (!this.data.text.trim() && !this.data.filePath) {
-      this.setData({ error: '请先粘贴通知原文，或选择 PNG/PDF 文件。' });
+      this.setData({ error: '请先粘贴通知原文，或选择 PNG/JPEG/PDF 文件。' });
       return;
     }
     this.setData({ loading: true, error: '' });

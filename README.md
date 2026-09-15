@@ -8,7 +8,7 @@
 
 ## 当前阶段
 
-可运行底座检查点：已提供冻结 v1 公共 Schema/运行时校验、`user-data-export/v1` 隐私导出、Node 26 SQLite 迁移与 Repository、受限图片/PDF 二进制上传持久化、角色闸门、规则解析 HTTP 服务、Document → ParseJob → VerifiedActionObject → 用户确认 → Task 闭环、解析失败后的用户确认人工建任务回退、统一错误/幂等/requestId、强化 Error Shield 和 30 条合成评测。真实 OCR/provider、微信人工验证、正式 800 条评测和生产能力仍未实现。
+可运行底座检查点：已提供冻结 v1 公共 Schema/运行时校验、`user-data-export/v1` 隐私导出、Node 26 SQLite 迁移与 Repository、受限 PNG/JPEG/PDF 二进制上传持久化、角色闸门、规则解析 HTTP 服务、Document → ParseJob → VerifiedActionObject → 用户确认 → Task 闭环、解析失败后的用户确认人工建任务回退、统一错误/幂等/requestId、强化 Error Shield、离线 PyMuPDF/RapidOCR 文件提取和 30 条合成评测。真实外部 provider、微信人工验证、正式 800 条评测和生产能力仍未实现。
 
 ## 目录
 
@@ -57,4 +57,4 @@ Windows PowerShell 可运行 `powershell -ExecutionPolicy Bypass -File scripts/v
 
 ## 尚未实现
 
-真实通知采集、真实身份认证、图片/PDF OCR、AI provider 接入、提醒发送、小程序页面人工验证、生产部署、正式 800 条数据、正式测试集冻结和正式实验均未实现。当前图片/PDF 仅完成受限本地字节保存与 OCR 边界接入，不代表 OCR 已运行。当前 `schemas/v1/` 是已验证的冻结 v1 机器契约；若需改变冻结定义或核心语义，必须新建版本/proposal。
+真实通知采集、真实身份认证、外部 AI provider、提醒发送、小程序页面人工验证、生产部署、正式 800 条数据、正式测试集冻结和正式实验均未实现。当前 PNG/JPEG/扫描 PDF 已接入本地离线 PyMuPDF/RapidOCR 路径并由真实文件测试执行；外部 provider 仍只通过可审计 adapter 测试，不代表生产 provider 已接入。当前 `schemas/v1/` 是已验证的冻结 v1 机器契约；若需改变冻结定义或核心语义，必须新建版本/proposal。

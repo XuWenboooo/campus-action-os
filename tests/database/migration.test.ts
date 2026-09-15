@@ -1,7 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { mkdtempSync, rmSync } from 'node:fs';
+import { DatabaseSync } from 'node:sqlite';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { type TextParseRequest, type TextParseResponse } from '@campus-action-os/protocol';
@@ -54,7 +56,7 @@ test('SQLite migration is repeatable, foreign keys are enabled, and all core tab
         version: number;
       }>
     ).map((row) => row.version),
-    [1, 2, 3, 4, 5, 6, 7],
+    [1, 2, 3, 4, 5, 6, 7, 8],
   );
   assert.deepEqual(
     (
@@ -105,6 +107,84 @@ test('SQLite migration is repeatable, foreign keys are enabled, and all core tab
   );
   db.exec('ROLLBACK');
   db.close();
+});
+
+test('JPEG migration upgrades a pre-Phase-2 database without losing source rows', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'campus-action-os-jpeg-upgrade-'));
+  const databasePath = join(directory, 'pre-phase2.sqlite');
+  const baseline = 'bf7ff78c5a2e1f6b5a57452cf4056e90cc721ab7';
+  const oldMigrationFiles = [
+    '001_initial.sql',
+    '002_action_change_history.sql',
+    '003_notice_task_sync.sql',
+    '004_document_files.sql',
+    '005_parse_job_request_hash.sql',
+    '006_action_projections.sql',
+    '007_one_active_task_per_action.sql',
+  ];
+  try {
+    const oldDb = new DatabaseSync(databasePath, { enableForeignKeyConstraints: true });
+    oldDb.exec('PRAGMA foreign_keys = ON;');
+    oldDb.exec(
+      'CREATE TABLE schema_migrations (version INTEGER PRIMARY KEY, name TEXT NOT NULL, applied_at TEXT NOT NULL) STRICT;',
+    );
+    for (const filename of oldMigrationFiles) {
+      const sql = execFileSync('git', ['show', `${baseline}:database/migrations/${filename}`], {
+        cwd: process.cwd(),
+        encoding: 'utf8',
+      });
+      oldDb.exec(sql);
+      oldDb
+        .prepare('INSERT INTO schema_migrations (version, name, applied_at) VALUES (?, ?, ?)')
+        .run(Number(filename.slice(0, 3)), filename, '2099-01-01T00:00:00.000Z');
+    }
+    oldDb.exec(
+      "INSERT INTO users (user_id, open_id, created_at) VALUES ('upgrade-user', 'upgrade-open', '2099-01-01T00:00:00Z');",
+    );
+    oldDb.exec(
+      "INSERT INTO documents (document_id, owner_user_id, title, content_type, text, content_sha256, data_origin, created_at) VALUES ('upgrade-document', 'upgrade-user', 'upgrade', 'image/png', '', 'hash', 'synthetic', '2099-01-01T00:00:00Z');",
+    );
+    oldDb.close();
+
+    const upgraded = migrateDatabase(databasePath);
+    assert.equal(
+      (upgraded.prepare('PRAGMA foreign_keys').get() as { foreign_keys: number }).foreign_keys,
+      1,
+    );
+    assert.equal(
+      (
+        upgraded
+          .prepare('SELECT count(*) AS count FROM documents WHERE document_id = ?')
+          .get('upgrade-document') as { count: number }
+      ).count,
+      1,
+    );
+    upgraded.exec(
+      "INSERT INTO documents (document_id, owner_user_id, title, content_type, text, content_sha256, data_origin, created_at) VALUES ('upgrade-jpeg', 'upgrade-user', 'jpeg', 'image/jpeg', '', 'hash', 'synthetic', '2099-01-01T00:00:00Z');",
+    );
+    upgraded.exec(
+      "INSERT INTO document_files (document_id, content, content_type, byte_length, content_sha256, created_at) VALUES ('upgrade-jpeg', X'FFD8FFE0', 'image/jpeg', 4, 'hash', '2099-01-01T00:00:00Z');",
+    );
+    assert.equal(
+      (
+        upgraded
+          .prepare('SELECT content_type FROM document_files WHERE document_id = ?')
+          .get('upgrade-jpeg') as { content_type: string }
+      ).content_type,
+      'image/jpeg',
+    );
+    assert.deepEqual(
+      (
+        upgraded.prepare('SELECT version FROM schema_migrations ORDER BY version').all() as Array<{
+          version: number;
+        }>
+      ).map((row) => row.version),
+      [1, 2, 3, 4, 5, 6, 7, 8],
+    );
+    upgraded.close();
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
 });
 
 test('Repository materializes action steps, dependencies, deadlines, and materials', () => {
@@ -332,7 +412,7 @@ test('file-backed Repository survives close and reopen', () => {
     const mediaDocument = first.createDocument({
       ownerUserId: 'persistent-user',
       title: '持久化截图',
-      contentType: 'image/png',
+      contentType: 'image/jpeg',
       text: '',
       dataOrigin: 'synthetic',
       sourceContent: raw,

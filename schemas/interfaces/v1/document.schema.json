@@ -9,7 +9,7 @@
     "document_id": { "type": "string", "minLength": 1 },
     "owner_user_id": { "type": "string", "minLength": 1 },
     "title": { "type": "string", "minLength": 1, "maxLength": 300 },
-    "content_type": { "enum": ["text/plain", "image/png", "application/pdf", "text/html"] },
+    "content_type": { "enum": ["text/plain", "image/png", "image/jpeg", "application/pdf", "text/html"] },
     "text": { "type": "string", "minLength": 0, "maxLength": 1000000 },
     "content_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
     "data_origin": { "enum": ["synthetic", "user_provided"] },

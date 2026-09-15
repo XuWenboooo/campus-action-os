@@ -5,7 +5,7 @@ import {
   protocolVersion,
   validateTextParseRequest,
 } from '@campus-action-os/protocol';
-import { parseText, type ParserFailure } from './rule-parser.js';
+import { RuleBasedProvider, type ParserProvider } from './parser-provider.js';
 
 const port = Number(process.env.AI_PORT ?? 3001);
 
@@ -32,13 +32,26 @@ async function readJson(request: IncomingMessage): Promise<unknown> {
   return JSON.parse(Buffer.concat(chunks).toString('utf8'));
 }
 
-function failureStatus(failure: ParserFailure): number {
-  return failure.code === 'UNSUPPORTED_CONTENT_TYPE' ? 415 : 400;
+function failureStatus(failure: { code: string }): number {
+  if (failure.code === 'UNSUPPORTED_CONTENT_TYPE') return 415;
+  if (failure.code === 'PARSER_TIMEOUT') return 504;
+  if (failure.code === 'PARSER_UNAVAILABLE' || failure.code === 'PARSER_RATE_LIMITED') return 503;
+  if (failure.code === 'PARSER_RESPONSE_INVALID') return 502;
+  if (failure.code === 'PARSER_CANCELLED') return 499;
+  return 400;
 }
 
-export function createParserServer(): Server {
+export type ParserServerOptions = {
+  provider?: ParserProvider;
+};
+
+export function createParserServer(options: ParserServerOptions = {}): Server {
+  const provider = options.provider ?? new RuleBasedProvider();
   return createServer(async (request, response) => {
     let requestId = requestIdFor(request);
+    const cancellation = new AbortController();
+    const onAborted = (): void => cancellation.abort();
+    request.once('aborted', onAborted);
     try {
       if (request.url === '/health' && request.method === 'GET') {
         send(
@@ -78,12 +91,17 @@ export function createParserServer(): Server {
           return;
         }
         if (!suppliedRequestId) requestId = valid.value.request_id;
-        const parsed = parseText(valid.value);
+        const parsed = await provider.parse(valid.value, cancellation.signal);
         if ('code' in parsed) {
           send(
             response,
             failureStatus(parsed),
-            createApiError(parsed.code, parsed.message, requestId),
+            createApiError(
+              parsed.code,
+              parsed.message,
+              requestId,
+              'retryable' in parsed ? parsed.retryable : false,
+            ),
             requestId,
           );
           return;
@@ -104,6 +122,8 @@ export function createParserServer(): Server {
         ),
         requestId,
       );
+    } finally {
+      request.removeListener('aborted', onAborted);
     }
   });
 }

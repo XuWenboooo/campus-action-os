@@ -23,6 +23,7 @@ DIRECT_IDENTIFIER = re.compile(r'(?:\b1[3-9]\d{9}\b|\b\d{17}[\dXx]\b|手机号|�
 DEIDENTIFICATION_RULES = (
     (re.compile(r'\b[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}\b'), '[REDACTED_EMAIL]'),
     (re.compile(r'\b1[3-9]\d{9}\b'), '[REDACTED_PHONE]'),
+    (re.compile(r'(?:身份证号?|证件号)\s*[:：]\s*[^\s,，。；;]{2,40}'), '[REDACTED_ID]'),
     (re.compile(r'\b\d{17}[\dXx]\b'), '[REDACTED_ID]'),
     (re.compile(r'(?:姓名|真实姓名)\s*[:：]\s*[^\s,，。；;]{2,20}'), '[REDACTED_NAME]'),
     (re.compile(r'学号\s*[:：]\s*[^\s,，。；;]{2,30}'), '[REDACTED_STUDENT_ID]'),

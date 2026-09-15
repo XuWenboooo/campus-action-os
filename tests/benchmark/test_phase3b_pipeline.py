@@ -242,7 +242,7 @@ class Phase3BPipelineTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             sample = formal_candidate()
-            sample['raw_input']['ocr_text'] = '姓名：张三 手机号：13812345678 邮箱：zhangsan@example.test 请提交课程回顾'
+            sample['raw_input']['ocr_text'] = '姓名：张三 学号：20260001 身份证：11010519491231002X 手机号：13812345678 邮箱：zhangsan@example.test 请提交课程回顾'
             sample['semantic_anchors'] = ['请提交课程回顾']
             input_path = root / 'raw-candidates.jsonl'
             output_path = root / 'deidentified-candidates.jsonl'
@@ -254,6 +254,8 @@ class Phase3BPipelineTest(unittest.TestCase):
             transformed = json.loads(output_path.read_text(encoding='utf-8'))
             transformed_text = transformed['raw_input']['ocr_text']
             self.assertNotIn('张三', transformed_text)
+            self.assertNotIn('20260001', transformed_text)
+            self.assertNotIn('11010519491231002X', transformed_text)
             self.assertNotIn('13812345678', transformed_text)
             self.assertNotIn('zhangsan@example.test', transformed_text)
             self.assertIn('请提交课程回顾', transformed_text)

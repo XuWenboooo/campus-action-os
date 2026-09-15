@@ -8,10 +8,10 @@
     <view class="action-title">{{action.title}}</view>
     <view class="deadline-label">DEADLINE</view><view class="deadline">{{action.deadline.display}}</view>
     <view class="field-grid">
-      <view><view class="caption">WHERE</view><view class="field-value">{{action.platform}}</view></view>
-      <view><view class="caption">NEED</view><view class="field-value">{{action.materials}}</view></view>
-      <view><view class="caption">AUDIENCE</view><view class="field-value">{{action.audience}}</view></view>
-      <view><view class="caption">CONDITION</view><view class="field-value">{{action.condition}}</view></view>
+      <view class="field"><view class="caption">WHERE</view><view class="field-value">{{action.platform}}</view></view>
+      <view class="field"><view class="caption">NEED</view><view class="field-value">{{action.materials}}</view></view>
+      <view class="field"><view class="caption">AUDIENCE</view><view class="field-value">{{action.audience}}</view></view>
+      <view class="field"><view class="caption">CONDITION</view><view class="field-value">{{action.condition}}</view></view>
     </view>
     <view class="divider"></view>
     <view class="why-row" bindtap="openEvidence"><view><view class="why-title">为什么？</view><view class="muted">每个判断都有原文依据</view></view><text class="why-arrow">→</text></view>

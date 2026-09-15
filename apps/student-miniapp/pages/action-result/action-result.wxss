@@ -4,7 +4,8 @@
 .action-result-card { margin-top: 30rpx; }
 .action-title { font-size: 38rpx; font-weight: 700; margin: 28rpx 0; }
 .deadline-label { color: #98a0b1; font-size: 21rpx; letter-spacing: 2rpx; }
-.field-grid { display: grid; grid-template-columns: 1fr 1fr; row-gap: 26rpx; margin-top: 30rpx; }
+.field-grid { display: flex; flex-wrap: wrap; margin-top: 30rpx; }
+.field { box-sizing: border-box; margin-bottom: 26rpx; padding-right: 16rpx; width: 50%; }
 .field-value { color: #30394b; font-size: 27rpx; margin-top: 5rpx; }
 .why-row { align-items: center; display: flex; justify-content: space-between; }
 .why-title { color: #3047b8; font-size: 29rpx; font-weight: 700; }

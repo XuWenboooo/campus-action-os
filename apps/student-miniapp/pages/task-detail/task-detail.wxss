@@ -3,5 +3,7 @@
 .deadline-card { background: #fff1f2; border-radius: 20rpx; margin-top: 30rpx; padding: 26rpx 30rpx; }
 .body-copy { color: #394255; font-size: 29rpx; line-height: 1.8; margin-top: 14rpx; }
 .evidence-link { color: #3047b8; font-size: 26rpx; font-weight: 600; margin-top: 24rpx; }
-.history { color: #59647a; display: grid; font-size: 26rpx; grid-template-columns: 1fr auto; row-gap: 22rpx; }
+.history { color: #59647a; display: flex; flex-wrap: wrap; font-size: 26rpx; }
+.history-label { box-sizing: border-box; padding-bottom: 22rpx; width: 65%; }
+.history-time { box-sizing: border-box; padding-bottom: 22rpx; text-align: right; width: 35%; }
 .history-dot { background: #3047b8; border-radius: 50%; display: inline-block; height: 12rpx; margin-right: 12rpx; width: 12rpx; }

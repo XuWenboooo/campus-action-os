@@ -12,6 +12,7 @@
     <view class="sample-chip" bindtap="loadScenario" data-scenario="student">学籍核验</view>
     <view class="sample-chip" bindtap="loadScenario" data-scenario="scholarship">奖学金</view>
     <view class="sample-chip" bindtap="loadScenario" data-scenario="extension">延期通知</view>
+    <view class="sample-chip" bindtap="loadScenario" data-scenario="orchestration">行动编排</view>
   </view>
   <button class="button" loading="{{loading}}" disabled="{{loading}}" bindtap="submit">开始编译行动 →</button>
   <view class="danger" wx:if="{{error}}">{{error}}</view>

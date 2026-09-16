@@ -1,0 +1,7 @@
+<view class="orchestration-card conflict-card" bindtap="open">
+  <view class="row"><text class="eyebrow">通知冲突</text><text class="tag red">待核对</text></view>
+  <view class="card-title">{{conflict.title}}</view>
+  <view class="diff-preview"><text class="strike">{{conflict.valueA}}</text><text class="arrow">↔</text><text class="new-date">{{conflict.valueB}}</text></view>
+  <view class="reason">不会自动覆盖任务，请查看两处通知依据。</view>
+  <view class="cta">查看依据 →</view>
+</view>

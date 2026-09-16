@@ -1,0 +1,5 @@
+.orchestration-card { background: #eef2ff; border: 1rpx solid #cbd5ff; border-radius: 20rpx; margin-top: 28rpx; padding: 26rpx 28rpx; }
+.orchestration-card .eyebrow { color: #5366c4; font-size: 20rpx; }
+.orchestration-card .card-title { color: #293b91; font-size: 31rpx; margin-top: 20rpx; }
+.orchestration-card .reason { color: #59678d; font-size: 24rpx; line-height: 1.65; margin-top: 12rpx; }
+.orchestration-card .cta { color: #3047b8; font-size: 25rpx; font-weight: 700; margin-top: 20rpx; }

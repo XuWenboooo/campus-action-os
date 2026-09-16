@@ -1,3 +1,7 @@
 {
-  "navigationBarTitleText": "任务中心"
+  "navigationBarTitleText": "任务中心",
+  "usingComponents": {
+    "orchestration-suggestion-card": "/components/orchestration-suggestion-card/orchestration-suggestion-card",
+    "conflict-alert-card": "/components/conflict-alert-card/conflict-alert-card"
+  }
 }

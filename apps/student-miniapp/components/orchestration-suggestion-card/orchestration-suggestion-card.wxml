@@ -1,0 +1,6 @@
+<view class="orchestration-card suggestion-card" bindtap="open">
+  <view class="row"><text class="eyebrow">ACTION ORCHESTRATOR</text><text class="tag blue">建议优先</text></view>
+  <view class="card-title">{{suggestion.title}}</view>
+  <view class="reason">{{suggestion.reason}}</view>
+  <view class="cta">查看行动链 →</view>
+</view>

@@ -3,7 +3,15 @@
   <view class="title">这条通知与你有关</view>
   <view class="result-sub"><status-badge label="高置信度" tone="green"></status-badge><text class="muted">已根据你的学生画像匹配</text></view>
   <view class="card relevance" wx:if="{{assessment}}"><view class="caption">PERSONAL RELEVANCE</view><view class="relevance-text">{{assessment.relevance_reason}}</view></view>
-  <view class="card action-result-card" wx:if="{{action}}">
+  <view wx:if="{{orchestration}}">
+    <view class="card orchestration-intro"><view class="caption">ACTION ORCHESTRATOR</view><view class="action-title">三条通知，编排成一条行动链</view><view class="muted">关系、依赖和冲突均保留原文证据。</view></view>
+    <view class="card orchestration-suggestion" wx:if="{{prioritySuggestion}}"><view class="row"><text class="tag blue">建议优先</text><text class="caption">为什么这样安排？</text></view><view class="action-title">{{prioritySuggestion.title}}</view><view class="relevance-text">{{prioritySuggestion.reason}}</view><view class="source">证据：3 条通知 · 可查看行动链</view></view>
+    <view class="section-title">Action Graph <text class="caption">行动路径</text></view>
+    <view class="graph orchestration-graph"><view class="graph-step" wx:for="{{orchestrationActions}}" wx:key="action_id" bindtap="openGraphEvidence" data-id="{{item.action_id}}"><view class="graph-number">0{{index + 1}}</view><view><view class="field-value">{{item.title}}</view><view class="caption">{{item.deadline.display}} · 查看依据 →</view></view></view></view>
+    <view class="card relation-card" wx:for="{{relations}}" wx:key="relation_id"><view class="row"><text class="tag blue">{{item.type}}</text><text class="caption">置信度 {{item.confidence}}</text></view><view class="body-copy">关系有明确通知来源</view><view class="source">{{item.evidence[0].source_text}}</view></view>
+    <block wx:for="{{conflicts}}" wx:key="conflict_id"><view class="card orchestration-conflict" wx:if="{{item.status === 'unresolved'}}"><view class="row"><text class="tag red">⚠️ 待核对</text><text class="caption">不会自动覆盖</text></view><view class="card-title">{{item.title}}</view><view class="diff-preview"><text class="strike">{{item.valueA}}</text><text class="arrow">↔</text><text class="new-date">{{item.valueB}}</text></view><view class="evidence-link" bindtap="openConflictEvidence">查看两处证据 →</view></view></block>
+  </view>
+  <view class="card action-result-card" wx:if="{{!orchestration && action}}">
     <view class="row"><text class="tag blue">ACTION 01</text><text class="caption">待确认</text></view>
     <view class="action-title">{{action.title}}</view>
     <view class="deadline-label">DEADLINE</view><view class="deadline">{{action.deadline.display}}</view>
@@ -16,8 +24,8 @@
     <view class="divider"></view>
     <view class="why-row" bindtap="openEvidence"><view><view class="why-title">为什么？</view><view class="muted">每个判断都有原文依据</view></view><text class="why-arrow">→</text></view>
   </view>
-  <view class="section-title" wx:if="{{action && action.steps.length > 1}}">Action Graph <text class="caption">行动路径</text></view>
-  <view class="graph" wx:if="{{action}}"><view class="graph-step" wx:for="{{action.steps}}" wx:key="*this"><view class="graph-number">0{{index + 1}}</view><view><view class="field-value">{{item}}</view><view class="caption">待完成</view></view></view></view>
+  <view class="section-title" wx:if="{{!orchestration && action && action.steps.length > 1}}">Action Graph <text class="caption">行动路径</text></view>
+  <view class="graph" wx:if="{{!orchestration && action}}"><view class="graph-step" wx:for="{{action.steps}}" wx:key="*this"><view class="graph-number">0{{index + 1}}</view><view><view class="field-value">{{item}}</view><view class="caption">待完成</view></view></view></view>
   <view class="danger" wx:if="{{error}}">{{error}}</view>
-  <view class="bottom-bar" wx:if="{{action}}"><button class="button" loading="{{creating}}" disabled="{{creating}}" bindtap="createTask">确认并创建任务</button><button class="button ghost" bindtap="reject">这不是我的任务</button></view>
+  <view class="bottom-bar" wx:if="{{action && !orchestration}}"><button class="button" loading="{{creating}}" disabled="{{creating}}" bindtap="createTask">确认并创建任务</button><button class="button ghost" bindtap="reject">这不是我的任务</button></view>
 </view>

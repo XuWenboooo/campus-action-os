@@ -45,6 +45,14 @@ module.exports = {
     if (appConfig().useMock) return require('./mock').getPendingChanges();
     return request('/notification-changes?status=pending');
   },
+  getOrchestrationSummary() {
+    if (appConfig().useMock) return require('./mock').getOrchestrationSummary();
+    return Promise.resolve({ suggestion: null, conflict: null, relations: [], change_impacts: [] });
+  },
+  getOrchestrationResult() {
+    if (appConfig().useMock) return require('./mock').getOrchestrationResult();
+    return Promise.resolve({ orchestration: false, verified_actions: [] });
+  },
   resetDemoState() {
     if (appConfig().useMock) return require('./mock').resetDemoState();
     return Promise.resolve({ mode: 'BASELINE' });

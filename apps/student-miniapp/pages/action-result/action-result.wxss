@@ -15,3 +15,12 @@
 .graph-step:not(:last-child):after { background: #dfe4f3; content: ''; height: 30rpx; left: 23rpx; position: absolute; top: 68rpx; width: 2rpx; }
 .graph-number { align-items: center; background: #eaf0ff; border-radius: 50%; color: #3047b8; display: flex; font-size: 21rpx; height: 48rpx; justify-content: center; margin-right: 20rpx; width: 48rpx; }
 .bottom-bar .ghost { margin-top: 12rpx; }
+.orchestration-intro { margin-top: 30rpx; }
+.orchestration-suggestion { background: #eef2ff; border-color: #cbd5ff; margin-top: 24rpx; }
+.orchestration-suggestion .action-title { color: #293b91; font-size: 32rpx; margin: 20rpx 0 10rpx; }
+.orchestration-graph { margin-top: 4rpx; }
+.orchestration-graph .graph-step { border-bottom: 1rpx solid #edf0f5; }
+.orchestration-graph .graph-step:last-child { border-bottom: 0; }
+.relation-card { margin-top: 18rpx; padding: 24rpx 28rpx; }
+.relation-card .body-copy { margin-top: 14rpx; }
+.orchestration-conflict { background: #fff8f5; border-color: #f0c4b8; margin-top: 24rpx; }

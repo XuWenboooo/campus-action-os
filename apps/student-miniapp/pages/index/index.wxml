@@ -7,6 +7,8 @@
     <view class="stat"><view class="stat-number">{{upcomingTasks.length}}</view><view class="caption">未来 3 天</view></view>
     <view class="stat alert"><view class="stat-number">{{changedTasks.length}}</view><view class="caption">发生变化</view></view>
   </view>
+  <orchestration-suggestion-card wx:if="{{orchestrationSuggestion}}" suggestion="{{orchestrationSuggestion}}" bind:open="openOrchestration"></orchestration-suggestion-card>
+  <conflict-alert-card wx:if="{{conflictAlert}}" conflict="{{conflictAlert}}" bind:open="openConflict"></conflict-alert-card>
   <view class="section-title row"><view>Today <text class="caption">今天</text></view><text class="section-link" bindtap="openTasks">全部任务 →</text></view>
   <view class="card action-card" wx:for="{{todayTasks}}" wx:key="task_id" bindtap="openTask" data-id="{{item.task_id}}">
     <view class="row"><text class="tag orange">待完成</text><text class="caption">{{item.source}}</text></view>
@@ -33,6 +35,7 @@
     <view class="demo-chip" bindtap="openDemo" data-scenario="student"><text class="demo-icon">01</text><text>学籍核验</text></view>
     <view class="demo-chip" bindtap="openDemo" data-scenario="scholarship"><text class="demo-icon">02</text><text>奖学金</text></view>
     <view class="demo-chip" bindtap="openDemo" data-scenario="extension"><text class="demo-icon">03</text><text>延期通知</text></view>
+    <view class="demo-chip" bindtap="openDemo" data-scenario="orchestration"><text class="demo-icon">04</text><text>行动编排</text></view>
   </view>
   <view class="danger" wx:if="{{error}}">{{error}}</view>
   <view class="bottom-bar"><button class="button" bindtap="openImport">＋ 导入通知</button></view>

@@ -1,0 +1,5 @@
+.conflict-card { background: #fff8f5; border-color: #f0c4b8; }
+.conflict-card .eyebrow { color: #b55649; font-size: 20rpx; }
+.conflict-card .card-title { color: #713b35; font-size: 30rpx; margin-top: 20rpx; }
+.conflict-card .reason { color: #80635e; font-size: 24rpx; line-height: 1.6; margin-top: 12rpx; }
+.conflict-card .cta { color: #a34a3e; font-size: 25rpx; font-weight: 700; margin-top: 20rpx; }

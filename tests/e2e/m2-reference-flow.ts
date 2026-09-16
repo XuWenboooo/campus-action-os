@@ -26,6 +26,10 @@ export type ReferenceParseResult = {
   validation_errors?: Array<{ path: string; keyword: string; message: string }>;
 };
 
+export type ReferenceParser = {
+  parse(input: unknown): MockResult;
+};
+
 export type ReferenceReview = typeof referenceFlowProvenance & {
   request_id: string;
   document_id: string;
@@ -78,11 +82,11 @@ function toRequest(input: unknown): TextParseRequest | null {
 }
 
 export class M2ReferenceFlow {
-  private readonly parser: DeterministicMockParser;
+  private readonly parser: ReferenceParser;
   private readonly results = new Map<string, ReferenceParseResult>();
   private readonly tasks = new Map<string, ReferenceTask>();
 
-  constructor(parser = new DeterministicMockParser()) {
+  constructor(parser: ReferenceParser = new DeterministicMockParser()) {
     this.parser = parser;
   }
 

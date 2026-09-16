@@ -27,7 +27,7 @@
     "benchmark:audit": "node scripts/run-python-checks.mjs audit",
     "schema:check": "node scripts/run-python-checks.mjs integration",
     "test:python": "node scripts/run-python-checks.mjs all",
-    "test:m2": "node --test --import tsx tests/contracts/m2-text-contract.test.ts tests/e2e/m2-text-harness.test.ts tests/e2e/m2-independent-integration.test.ts",
+    "test:m2": "node --test --import tsx tests/contracts/m2-text-contract.test.ts tests/e2e/m2-text-harness.test.ts tests/e2e/m2-independent-integration.test.ts tests/e2e/m2-voice-parser-bridge.test.ts",
     "acceptance:m2": "tsx tools/integration/m2-reference-flow/acceptance.ts",
     "demo:m2": "tsx tools/integration/m2-reference-flow/demo.ts",
     "db:migrate": "tsx database/migrate.ts",

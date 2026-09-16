@@ -11,6 +11,7 @@ import {
   type VerifiedActionObject,
 } from '@campus-action-os/protocol';
 import { inspectCriticalErrors } from './error-shield.js';
+import { normalizeSpokenText, type SpokenActionCandidate } from './spoken-normalizer.js';
 
 export type ParserFailure = {
   code: 'INVALID_REQUEST' | 'UNSUPPORTED_CONTENT_TYPE';
@@ -70,7 +71,63 @@ function claim(
   return { value, epistemic_status: epistemicStatus, evidence_ids: evidenceIds };
 }
 
-function isoDeadline(line: string | undefined): {
+function naturalDeadline(
+  value: string,
+  reference: string,
+): {
+  value: string | null;
+  precision: VerifiedActionObject['deadline']['precision'];
+  boundary: VerifiedActionObject['deadline']['boundary_semantics'];
+  ambiguous: boolean;
+} {
+  const referenceDate = new Date(reference);
+  if (Number.isNaN(referenceDate.getTime()))
+    return { value: null, precision: 'unknown', boundary: 'unknown', ambiguous: true };
+  const shanghaiReference = new Date(referenceDate.getTime() + 8 * 60 * 60 * 1000);
+  const date = new Date(
+    Date.UTC(
+      shanghaiReference.getUTCFullYear(),
+      shanghaiReference.getUTCMonth(),
+      shanghaiReference.getUTCDate(),
+      12,
+    ),
+  );
+  const weekdayMatch = value.match(/周([一二三四五六日天])/u);
+  if (weekdayMatch) {
+    const weekdayMap: Record<string, number> = {
+      日: 0,
+      天: 0,
+      一: 1,
+      二: 2,
+      三: 3,
+      四: 4,
+      五: 5,
+      六: 6,
+    };
+    const target = weekdayMap[weekdayMatch[1]];
+    const current = date.getUTCDay();
+    let delta = (target - current + 7) % 7;
+    if (delta === 0 && !/今天|本周|这周/u.test(value)) delta = 7;
+    date.setUTCDate(date.getUTCDate() + delta);
+  } else if (/明天/u.test(value)) date.setUTCDate(date.getUTCDate() + 1);
+  else if (/后天/u.test(value)) date.setUTCDate(date.getUTCDate() + 2);
+  const timeMatch = value.match(/(\d{1,2})(?::(\d{2}))?点?(?:([0-9]{1,2})分)?/u);
+  let precision: VerifiedActionObject['deadline']['precision'] = 'day';
+  if (timeMatch) {
+    let hour = Number(timeMatch[1]);
+    const minute = Number(timeMatch[2] ?? timeMatch[3] ?? 0);
+    if (/下午|晚上/u.test(value) && hour < 12) hour += 12;
+    date.setUTCHours(hour, minute, 0, 0);
+    precision = timeMatch[2] || timeMatch[3] ? 'minute' : 'hour';
+  }
+  const dateText = `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}-${String(date.getUTCDate()).padStart(2, '0')}`;
+  const iso = timeMatch
+    ? `${dateText}T${String(date.getUTCHours()).padStart(2, '0')}:${String(date.getUTCMinutes()).padStart(2, '0')}:00+08:00`
+    : dateText;
+  return { value: iso, precision, boundary: 'before', ambiguous: !timeMatch };
+}
+
+function isoDeadline(line: string | undefined, reference: string): {
   value: string | null;
   precision: VerifiedActionObject['deadline']['precision'];
   boundary: VerifiedActionObject['deadline']['boundary_semantics'];
@@ -82,7 +139,14 @@ function isoDeadline(line: string | undefined): {
   const match = line.match(
     /(20\d{2})[-年](\d{1,2})[-月](\d{1,2})日?(?:[ T]?(\d{1,2})[:：](\d{2}))?/,
   );
-  if (!match) return { value: null, precision: 'unknown', boundary: 'unknown', ambiguous: false };
+  if (!match) {
+    const natural = line.match(
+      /(?:今天|今晚|今早|明天|后天|(?:本周|这周|下周)[一二三四五六日天]|周[一二三四五六日天])(?:早上|上午|中午|下午|晚上)?(?:\d{1,2}(?::\d{2})?点?(?:\d{1,2}分)?)?/u,
+    )?.[0];
+    return natural
+      ? naturalDeadline(natural, reference)
+      : { value: null, precision: 'unknown', boundary: 'unknown', ambiguous: false };
+  }
   const [, year, month, day, hour, minute] = match;
   const date = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
   const value = hour === undefined ? date : `${date}T${hour.padStart(2, '0')}:${minute}:00+08:00`;
@@ -101,16 +165,27 @@ function isoDeadline(line: string | undefined): {
   };
 }
 
-function findActions(lines: string[]): Array<{ text: string; line: string }> {
+type ActionInput = { text: string; line: string; spoken?: SpokenActionCandidate };
+
+function findActions(
+  lines: string[],
+  spoken: ReturnType<typeof normalizeSpokenText>,
+): ActionInput[] {
   const numbered = lines
     .map((line) => ({ line, match: line.trim().match(/^(?:\d+[.)、]|[-*])\s*(.+)$/) }))
     .filter((item): item is { line: string; match: RegExpMatchArray } => Boolean(item.match))
     .map(({ line, match }) => ({ text: match[1].trim(), line }));
   if (numbered.length > 0) return numbered;
+  if (spoken.candidates.length > 0)
+    return spoken.candidates.map((candidate) => ({
+      text: candidate.action_text,
+      line: candidate.source_text,
+      spoken: candidate,
+    }));
   return lines
     .filter(
       (line) =>
-        /请|需|完成|提交|报名|参加|上传|填写|预约/.test(line) &&
+        /请|需|完成|提交|报名|参加|上传|填写|预约|交|传|发|确认|缴费|领取/.test(line) &&
         !/适用|截止|材料|地点|平台|条件/.test(line),
     )
     .slice(0, 8)
@@ -145,6 +220,7 @@ export function parseText(request: TextParseRequest): TextParseResponse | Parser
     return { code: 'UNSUPPORTED_CONTENT_TYPE', message: 'rule parser 目前只接受标准化 text/plain' };
   const startedAt = new Date().toISOString();
   const source = normalize(request.document.text);
+  const spoken = normalizeSpokenText(source);
   const lines = source
     .split('\n')
     .map((line) => line.trim())
@@ -160,7 +236,7 @@ export function parseText(request: TextParseRequest): TextParseResponse | Parser
   const relevanceEvidence = audienceLine
     ? evidence('ev-relevance', audienceLine, 'user_relevance')
     : undefined;
-  const actionInputs = findActions(lines);
+  const actionInputs = findActions(lines, spoken);
   const deadlineLines = lines.filter((line) =>
     /^(?:截止|截至|报名时间|时间|日期)|20\d{2}[-年]/.test(line),
   );
@@ -171,10 +247,16 @@ export function parseText(request: TextParseRequest): TextParseResponse | Parser
   const platformLine = lineFor(source, /^(?:平台|系统|线上平台|在线平台|线上|邮箱|链接|网址)[:：]/);
   const conditionLine = lineFor(source, /^(?:条件|要求|仅限|须知|须满足|如果|若)/);
   const exceptionLine = lineFor(source, /^(?:除.*外|不适用于|例外)/);
-  const actionDeadlineLines = actionInputs.map(({ line }, index) =>
-    deadlineLineForAction(line, index, deadlineLines),
+  const actionDeadlineLines = actionInputs.map(({ line, spoken: spokenAction }, index) => {
+    if (spokenAction?.deadline_text) return line;
+    const inherited = actionInputs[index - 1]?.spoken?.deadline_text
+      ? actionInputs[index - 1].line
+      : undefined;
+    return deadlineLineForAction(line, index, deadlineLines) ?? inherited;
+  });
+  const actionDeadlines = actionDeadlineLines.map((line) =>
+    isoDeadline(line, request.execution_context.requested_at),
   );
-  const actionDeadlines = actionDeadlineLines.map(isoDeadline);
   const warnings: TextParseResponse['warnings'] = [];
   if (actionDeadlines.some((deadline) => !deadline.value))
     warnings.push({
@@ -200,17 +282,22 @@ export function parseText(request: TextParseRequest): TextParseResponse | Parser
       message: '未找到明确可执行行动',
       paths: ['/verified_actions'],
     });
-  const parsedActions = actionInputs.map(({ text, line }, index): VerifiedActionObject => {
+  const parsedActions = actionInputs.map(({ text, line, spoken: spokenAction }, index): VerifiedActionObject => {
     const actionId = `${request.document.document_id}:action:${index + 1}`;
     const deadlineLine = actionDeadlineLines[index];
     const deadline = actionDeadlines[index];
     const evidenceId = (kind: string) =>
       `${request.document.document_id}:evidence:${kind}:${index + 1}`;
+    const actionAudienceLine = spokenAction?.audience_text ?? audienceLine;
+    const actionAudience = spokenAction?.audience_text ?? audience;
+    const actionPlatformLine = spokenAction?.platform_source_text ? line : platformLine;
+    const actionPlatform = spokenAction?.platform ?? null;
+    const actionConditionLine = spokenAction?.condition_text ?? conditionLine;
     const actionRelevanceEvidence = relevanceEvidence
       ? evidence(evidenceId('relevance'), relevanceEvidence.source_text, 'user_relevance')
       : undefined;
-    const populationEvidence = audienceLine
-      ? evidence(evidenceId('population'), audienceLine, 'target_population')
+    const populationEvidence = actionAudienceLine
+      ? evidence(evidenceId('population'), actionAudienceLine, 'target_population')
       : undefined;
     const stepEvidenceId = evidenceId('step');
     const actionEvidence: Evidence[] = [evidence(stepEvidenceId, line, 'steps')];
@@ -241,22 +328,24 @@ export function parseText(request: TextParseRequest): TextParseResponse | Parser
       : null;
     if (locationLine)
       actionEvidence.push(evidence(evidenceId('location'), locationLine, 'location'));
-    const platform = platformLine
-      ? claim(platformLine.replace(/^.*?(平台|系统)[:：]?\s*/, ''), 'explicit', [
-          evidenceId('platform'),
-        ])
+    const platform = actionPlatformLine || actionPlatform
+      ? claim(
+          actionPlatform ?? actionPlatformLine?.replace(/^.*?(平台|系统)[:：]?\s*/, '') ?? '',
+          'explicit',
+          [evidenceId('platform')],
+        )
       : null;
-    if (platformLine)
-      actionEvidence.push(evidence(evidenceId('platform'), platformLine, 'platform'));
+    if (actionPlatformLine || actionPlatform)
+      actionEvidence.push(evidence(evidenceId('platform'), line, 'platform'));
     const link = source.match(/https?:\/\/[^\s)]+/)?.[0] ?? null;
     const entryLink = link ? claim(link, 'explicit', [evidenceId('entry')]) : null;
     if (link)
       actionEvidence.push(evidence(evidenceId('entry'), platformLine ?? link, 'entry_link'));
-    const condition = conditionLine
+    const condition = actionConditionLine
       ? [
           {
             condition_id: `${actionId}:condition:1`,
-            statement: conditionLine,
+            statement: actionConditionLine,
             outcomes: [
               { label: '满足条件', step_ids: [step.step_id] },
               { label: '不满足条件', step_ids: [] },
@@ -266,8 +355,8 @@ export function parseText(request: TextParseRequest): TextParseResponse | Parser
           },
         ]
       : [];
-    if (conditionLine)
-      actionEvidence.push(evidence(evidenceId('condition'), conditionLine, 'conditions'));
+    if (actionConditionLine)
+      actionEvidence.push(evidence(evidenceId('condition'), line, 'conditions'));
     const exception = exceptionLine
       ? [
           {
@@ -295,8 +384,8 @@ export function parseText(request: TextParseRequest): TextParseResponse | Parser
       deadline: deadlineLine && deadline.value ? 'explicit' : 'unknown',
       required_materials: materialsLine ? 'explicit' : 'unknown',
       location: locationLine ? 'explicit' : 'unknown',
-      platform: platformLine ? 'explicit' : 'unknown',
-      conditions: conditionLine ? 'explicit' : 'unknown',
+      platform: actionPlatformLine || actionPlatform ? 'explicit' : 'unknown',
+      conditions: actionConditionLine ? 'explicit' : 'unknown',
       exceptions: exceptionLine ? 'explicit' : 'unknown',
     } as const;
     return {
@@ -304,7 +393,7 @@ export function parseText(request: TextParseRequest): TextParseResponse | Parser
       action_id: actionId,
       document_id: request.document.document_id,
       title: text.slice(0, 300),
-      target_population: [audience],
+      target_population: [actionAudience],
       user_relevance: userRelevance,
       relevance_reason:
         userRelevance === 'relevant'
@@ -330,7 +419,11 @@ export function parseText(request: TextParseRequest): TextParseResponse | Parser
       entry_link: entryLink,
       required_materials: materials,
       consequence: null,
-      obligation: /必须|须|截止|务必/.test(text) ? 'mandatory' : 'unknown',
+      obligation:
+        /必须|须|截止|务必|要|需要|得|记得|别忘了|请/.test(text) ||
+        Boolean(spokenAction?.obligation_text)
+          ? 'mandatory'
+          : 'unknown',
       evidence: actionEvidence,
       confidence: { score: warnings.length === 0 ? 0.9 : 0.45, basis: 'rule_review' },
       epistemic_status: 'explicit',

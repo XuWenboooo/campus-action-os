@@ -44,7 +44,8 @@
     "check": "npm run format:check && npm run lint && npm run typecheck && npm run check:miniapp && npm run check:openapi && npm run test && npm run build && npm run test:built && npm run scan:secrets && npm run test:python && npm run release:m2-manifest:verify && npm run release:manifest:verify && npm run diff:check",
     "scan:secrets": "node scripts/scan-secrets.mjs",
     "dev:api": "tsx services/api/src/server.ts",
-    "dev:ai": "tsx services/ai-parser/src/server.ts"
+    "dev:ai": "tsx services/ai-parser/src/server.ts",
+    "demo:voice": "tsx tools/run-voice-to-action-demo.ts"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",

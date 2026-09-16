@@ -12,6 +12,7 @@
 .compact-card .card-title { margin: 0; font-size: 29rpx; }
 .compact-card .tag { flex-shrink: 0; margin-left: 12rpx; }
 .change-card { border-left: 6rpx solid #d9656e; }
+.change-label { color: #59647a; font-size: 25rpx; margin-top: 20rpx; }
 .diff-preview { align-items: center; display: flex; font-size: 26rpx; margin-top: 20rpx; }
 .strike { color: #9ca3b3; text-decoration: line-through; }
 .arrow { color: #a2a9b8; margin: 0 14rpx; }

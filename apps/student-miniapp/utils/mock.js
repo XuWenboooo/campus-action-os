@@ -1,5 +1,5 @@
 const STORAGE_KEY = 'campusActionMockState';
-const STATE_VERSION = 2;
+const STATE_VERSION = 3;
 
 const scenarios = {
   student: {
@@ -23,7 +23,7 @@ const scenarios = {
 };
 
 function baselineState() {
-  return { schemaVersion: STATE_VERSION, mode: 'BASELINE', activeScenario: null, tasks: [{ task_id: 'task-orientation', title: '完成实验室安全准入学习', status: 'pending', due_at: '2026-09-15T18:00:00+08:00', due_display: '今天 18:00', platform: '学习平台', source: '实验室管理处', action_id: 'action-orientation' }], jobs: {}, documents: {}, pollCount: {} };
+  return { schemaVersion: STATE_VERSION, mode: 'BASELINE', activeScenario: null, tasks: [{ task_id: 'task-orientation', title: '完成实验室安全准入学习', status: 'pending', due_at: '2026-09-15T18:00:00+08:00', due_display: '今天 18:00', home_bucket: 'today', platform: '学习平台', source: '实验室管理处', action_id: 'action-orientation' }], changeEvents: [], jobs: {}, documents: {}, pollCount: {} };
 }
 
 function readState() {
@@ -44,26 +44,31 @@ module.exports = {
     const state = baselineState();
     state.mode = `DEMO_${scenario.toUpperCase()}`;
     state.activeScenario = scenario;
-    if (scenario === 'extension') state.tasks.push({ task_id: 'task-extension', title: '大学生创新训练项目申报', status: 'pending', due_at: '2026-09-15T23:59:00+08:00', due_display: '9 月 15 日 23:59', platform: '创新训练项目系统', source: '教务处', action_id: 'action-extension' });
+    if (scenario === 'extension') {
+      state.tasks.push({ task_id: 'task-extension', title: '大学生创新训练项目申报', status: 'pending', due_at: '2026-09-15T23:59:00+08:00', due_display: '9 月 15 日 23:59', home_bucket: 'today', platform: '创新训练项目系统', source: '教务处', action_id: 'action-extension' });
+      state.changeEvents.push({ change_event_id: 'change-extension', status: 'pending', task_id: 'task-extension', notification_id: 'notice-extension', title: '大学生创新训练项目申报', change_label: '截止时间发生变化', old_value: '09-15 23:59', new_value: '09-18 23:59', source: '教务处 · 补充通知', reason: '补充通知将原截止时间延期至 9 月 18 日 23:59。' });
+    }
     return Promise.resolve(clone(writeState(state)));
   },
   getDemoState() { return Promise.resolve(clone(readState())); },
   getDemoScenario(name) { const scenario = scenarios[name] || scenarios.student; return Promise.resolve(clone(scenario)); },
   getTasks() { return Promise.resolve({ tasks: clone(readState().tasks) }); },
+  getPendingChanges() { const state = readState(); const changes = state.changeEvents.filter((event) => event.status === 'pending').map((event) => { const task = state.tasks.find((item) => item.task_id === event.task_id) || null; return { ...clone(event), task_id: event.task_id, task_title: task ? task.title : event.title }; }); return Promise.resolve({ changes }); },
   createDocument(text) { const state = readState(); const id = uniqueId('doc'); const scenario = pickScenario(text); state.documents[id] = { document_id: id, text, scenario }; writeState(state); return Promise.resolve({ document: clone(state.documents[id]) }); },
   uploadMediaDocument() { return this.createDocument(scenarios.student.source); },
   parseDocument(documentId) { const state = readState(); const jobId = uniqueId('job'); state.jobs[jobId] = { parse_job_id: jobId, document_id: documentId, status: 'queued', result: null }; state.pollCount[jobId] = 0; writeState(state); return Promise.resolve(clone(state.jobs[jobId])); },
   getParseJob(jobId) { const state = readState(); const job = state.jobs[jobId]; if (!job) return Promise.reject(new Error('job not found')); state.pollCount[jobId] += 1; if (state.pollCount[jobId] >= 2) { const document = state.documents[job.document_id] || {}; const scenarioName = document.scenario || 'student'; const scenario = scenarios[scenarioName] || scenarios.student; job.status = 'succeeded'; job.result = { document_assessment: clone(scenario.assessment), verified_actions: clone(scenario.actions), source_text: scenario.source, scenario: scenarioName }; } writeState(state); return Promise.resolve(clone(job)); },
   confirmAction(actionId) { return Promise.resolve({ action: { action_id: actionId, verification_status: 'confirmed' } }); },
   rejectAction() { return Promise.resolve({ ok: true }); },
-  createTask(actionId) { const state = readState(); const action = findAction(actionId); if (!action) return Promise.reject(new Error('action not found')); let task = state.tasks.find((item) => item.action_id === actionId); if (!task) { task = { task_id: uniqueId('task'), title: action.title, status: 'pending', due_at: action.deadline.value, due_display: action.deadline.display, platform: action.platform, source: action.source, action_id: action.action_id }; state.tasks.unshift(task); } writeState(state); return Promise.resolve({ task: clone(task) }); },
-  createManualTask(documentId, title, dueAt) { const state = readState(); const task = { task_id: uniqueId('task'), title, status: 'pending', due_at: dueAt || '', due_display: dueAt || '待确认', platform: '待确认', source: state.documents[documentId] ? '导入通知' : '手动创建', action_id: '' }; state.tasks.unshift(task); writeState(state); return Promise.resolve({ task: clone(task) }); },
+  createTask(actionId) { const state = readState(); const action = findAction(actionId); if (!action) return Promise.reject(new Error('action not found')); let task = state.tasks.find((item) => item.action_id === actionId); if (!task) { task = { task_id: uniqueId('task'), title: action.title, status: 'pending', due_at: action.deadline.value, due_display: action.deadline.display, home_bucket: action.action_id === 'action-scholarship' ? 'upcoming' : 'today', platform: action.platform, source: action.source, action_id: action.action_id }; state.tasks.unshift(task); } writeState(state); return Promise.resolve({ task: clone(task) }); },
+  createManualTask(documentId, title, dueAt) { const state = readState(); const task = { task_id: uniqueId('task'), title, status: 'pending', due_at: dueAt || '', due_display: dueAt || '待确认', home_bucket: dueAt && /^2026-09-15/.test(dueAt) ? 'today' : 'upcoming', platform: '待确认', source: state.documents[documentId] ? '导入通知' : '手动创建', action_id: '' }; state.tasks.unshift(task); writeState(state); return Promise.resolve({ task: clone(task) }); },
   getAction(actionId) { return Promise.resolve({ action: findAction(actionId) || findAction('action-student') }); },
   getEvidence(actionId) { const action = findAction(actionId) || findAction('action-student'); const scenario = Object.values(scenarios).find((item) => item.actions.some((entry) => entry.action_id === action.action_id)) || scenarios.student; return Promise.resolve({ action: clone(action), source_text: scenario.source }); },
   getTask(taskId) { const task = readState().tasks.find((item) => item.task_id === taskId); return task ? Promise.resolve({ task: clone(task), action: findAction(task.action_id) }) : Promise.reject(new Error('task not found')); },
   completeTask(taskId) { const state = readState(); const task = state.tasks.find((item) => item.task_id === taskId); if (!task) return Promise.reject(new Error('task not found')); task.status = 'completed'; writeState(state); return Promise.resolve({ task: clone(task) }); },
-  getNotificationDiff() { return Promise.resolve({ notification_id: 'notice-extension', title: '关于延长大学生创新训练项目申报时间的补充通知', source: scenarios.extension.source, fields: [{ label: '截止时间', oldValue: '9 月 15 日 23:59', newValue: '9 月 18 日 23:59', type: 'deadline' }, { label: '材料', oldValue: '学生证', newValue: '学生证 + 成绩单', type: 'materials' }] }); },
-  applyNotificationDiff() { const state = readState(); const task = state.tasks.find((item) => item.task_id === 'task-extension'); if (task) { task.status = 'pending'; task.due_at = '2026-09-18T23:59:00+08:00'; task.due_display = '9 月 18 日 23:59'; } writeState(state); return Promise.resolve({ ok: true }); },
+  getNotificationDiff(changeEventId) { const state = readState(); const event = state.changeEvents.find((item) => item.change_event_id === changeEventId) || state.changeEvents.find((item) => item.status === 'pending'); if (!event) return Promise.reject(new Error('change event not found')); return Promise.resolve({ ...clone(event), task_id: event.task_id, notification_id: event.notification_id, title: '关于延长大学生创新训练项目申报时间的补充通知', source: scenarios.extension.source, fields: [{ label: '截止时间', oldValue: '9 月 15 日 23:59', newValue: '9 月 18 日 23:59', type: 'deadline' }, { label: '材料', oldValue: '学生证', newValue: '学生证 + 成绩单', type: 'materials' }] }); },
+  applyNotificationDiff(changeEventId) { const state = readState(); const event = state.changeEvents.find((item) => item.change_event_id === changeEventId) || state.changeEvents.find((item) => item.status === 'pending'); if (!event) return Promise.reject(new Error('change event not found')); const task = state.tasks.find((item) => item.task_id === event.task_id); if (task) { task.status = 'pending'; task.home_bucket = 'upcoming'; task.due_at = '2026-09-18T23:59:00+08:00'; task.due_display = '9 月 18 日 23:59'; } event.status = 'resolved'; event.resolved_at = new Date().toISOString(); writeState(state); return Promise.resolve({ ok: true, change_event_id: event.change_event_id, task_id: event.task_id, status: event.status }); },
+  dismissNotificationDiff(changeEventId) { const state = readState(); const event = state.changeEvents.find((item) => item.change_event_id === changeEventId); if (!event) return Promise.reject(new Error('change event not found')); event.status = 'dismissed'; writeState(state); return Promise.resolve({ ok: true, change_event_id: event.change_event_id, status: event.status }); },
   getProfile() { return Promise.resolve({ profile: { school: '示例大学', grade: '2026届', education_level: '本科', college: '计算机学院', identity: '在校学生' } }); },
   updateProfile(data) { return Promise.resolve({ profile: data }); },
   exportUserData() { return Promise.resolve(readState()); },

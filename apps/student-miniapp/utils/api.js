@@ -41,6 +41,10 @@ module.exports = {
     if (appConfig().useMock) return require('./mock').getTasks();
     return request('/tasks');
   },
+  getPendingChanges() {
+    if (appConfig().useMock) return require('./mock').getPendingChanges();
+    return request('/notification-changes?status=pending');
+  },
   resetDemoState() {
     if (appConfig().useMock) return require('./mock').resetDemoState();
     return Promise.resolve({ mode: 'BASELINE' });
@@ -183,13 +187,17 @@ module.exports = {
     if (appConfig().useMock) return require('./mock').getTask(taskId);
     return request(`/tasks/${taskId}`);
   },
-  getNotificationDiff() {
-    if (appConfig().useMock) return require('./mock').getNotificationDiff();
-    return request('/notifications/diff');
+  getNotificationDiff(changeEventId) {
+    if (appConfig().useMock) return require('./mock').getNotificationDiff(changeEventId);
+    return request(`/notifications/diff${changeEventId ? `?changeEventId=${encodeURIComponent(changeEventId)}` : ''}`);
   },
-  applyNotificationDiff() {
-    if (appConfig().useMock) return require('./mock').applyNotificationDiff();
-    return request('/notifications/diff/apply', { method: 'POST', idempotencyKey: key('notification-diff'), data: { confirmed: true } });
+  applyNotificationDiff(changeEventId) {
+    if (appConfig().useMock) return require('./mock').applyNotificationDiff(changeEventId);
+    return request('/notifications/diff/apply', { method: 'POST', idempotencyKey: key('notification-diff'), data: { changeEventId, confirmed: true } });
+  },
+  dismissNotificationDiff(changeEventId) {
+    if (appConfig().useMock) return require('./mock').dismissNotificationDiff(changeEventId);
+    return request('/notifications/diff/dismiss', { method: 'POST', idempotencyKey: key('notification-diff-dismiss'), data: { changeEventId, confirmed: true } });
   },
   getDemoScenario(name) {
     if (appConfig().useMock) return require('./mock').getDemoScenario(name);

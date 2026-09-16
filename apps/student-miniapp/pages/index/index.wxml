@@ -21,11 +21,12 @@
     <view class="source">{{item.platform}} · {{item.source}}</view>
   </view>
   <view class="section-title">Changed <text class="caption">有变化</text></view>
-  <view class="card change-card" wx:for="{{changedTasks}}" wx:key="task_id" bindtap="openDiff">
+  <view class="card change-card" wx:for="{{changedTasks}}" wx:key="change_event_id" bindtap="openDiff" data-id="{{item.change_event_id}}">
     <view class="row"><text class="tag red">通知有更新</text><text class="caption">刚刚发现</text></view>
-    <view class="card-title">{{item.title}}</view>
-    <view class="diff-preview"><text class="strike">09-15 23:59</text><text class="arrow">→</text><text class="new-date">09-18 23:59</text></view>
-    <view class="source">查看变化依据 →</view>
+    <view class="card-title">{{item.task_title}}</view>
+    <view class="change-label">{{item.change_label}}</view>
+    <view class="diff-preview"><text class="strike">{{item.old_value}}</text><text class="arrow">→</text><text class="new-date">{{item.new_value}}</text></view>
+    <view class="source">{{item.source}} · 查看变化 →</view>
   </view>
   <view class="section-title">Try a scenario <text class="caption">现场演示</text></view>
   <view class="demo-row">

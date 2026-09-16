@@ -4,7 +4,7 @@
   <view class="muted">今天，你只需要关注这些。</view>
   <view class="hero-stats">
     <view class="stat"><view class="stat-number">{{todayTasks.length}}</view><view class="caption">今天需要完成</view></view>
-    <view class="stat"><view class="stat-number">{{upcomingTasks.length + 3}}</view><view class="caption">未来 3 天</view></view>
+    <view class="stat"><view class="stat-number">{{upcomingTasks.length}}</view><view class="caption">未来 3 天</view></view>
     <view class="stat alert"><view class="stat-number">{{changedTasks.length}}</view><view class="caption">发生变化</view></view>
   </view>
   <view class="section-title row"><view>Today <text class="caption">今天</text></view><text class="section-link" bindtap="openTasks">全部任务 →</text></view>

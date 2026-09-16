@@ -1,4 +1,5 @@
 const STORAGE_KEY = 'campusActionMockState';
+const STATE_VERSION = 2;
 
 const scenarios = {
   student: {
@@ -21,11 +22,15 @@ const scenarios = {
   },
 };
 
-function initialState() {
-  return { tasks: [{ task_id: 'task-student', title: '完成学籍信息核验', status: 'pending', due_at: '2026-09-15T23:59:00+08:00', due_display: '今天 23:59', platform: '学信网', source: '教务处', action_id: 'action-student' }, { task_id: 'task-orientation', title: '完成实验室安全准入学习', status: 'pending', due_at: '2026-09-15T18:00:00+08:00', due_display: '今天 18:00', platform: '学习平台', source: '实验室管理处', action_id: 'action-orientation' }, { task_id: 'task-scholarship', title: '国家奖学金材料提交', status: 'pending', due_at: '2026-09-18T17:00:00+08:00', due_display: '3 天后 · 17:00', platform: '学院初审', source: '学生资助管理中心', action_id: 'action-scholarship' }, { task_id: 'task-extension', title: '大学生创新训练项目申报', status: 'changed', due_at: '2026-09-15T23:59:00+08:00', due_display: '原定 9 月 15 日 23:59', platform: '创新训练项目系统', source: '教务处', action_id: 'action-extension' }], jobs: {}, documents: {}, pollCount: {}, scenario: 'student' };
+function baselineState() {
+  return { schemaVersion: STATE_VERSION, mode: 'BASELINE', activeScenario: null, tasks: [{ task_id: 'task-orientation', title: '完成实验室安全准入学习', status: 'pending', due_at: '2026-09-15T18:00:00+08:00', due_display: '今天 18:00', platform: '学习平台', source: '实验室管理处', action_id: 'action-orientation' }], jobs: {}, documents: {}, pollCount: {} };
 }
 
-function readState() { return wx.getStorageSync(STORAGE_KEY) || initialState(); }
+function readState() {
+  const stored = wx.getStorageSync(STORAGE_KEY);
+  if (!stored || stored.schemaVersion !== STATE_VERSION) return writeState(baselineState());
+  return stored;
+}
 function writeState(state) { wx.setStorageSync(STORAGE_KEY, state); return state; }
 function clone(value) { return JSON.parse(JSON.stringify(value)); }
 function uniqueId(prefix) { return `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`; }
@@ -33,13 +38,22 @@ function findAction(actionId) { for (const item of Object.values(scenarios)) { c
 function pickScenario(text) { if (/奖学金/.test(text)) return 'scholarship'; if (/延期|延长|创新训练/.test(text)) return 'extension'; return 'student'; }
 
 module.exports = {
-  reset() { writeState(initialState()); },
+  resetDemoState() { return Promise.resolve(clone(writeState(baselineState()))); },
+  enterDemoScenario(name) {
+    const scenario = ['student', 'scholarship', 'extension'].includes(name) ? name : 'student';
+    const state = baselineState();
+    state.mode = `DEMO_${scenario.toUpperCase()}`;
+    state.activeScenario = scenario;
+    if (scenario === 'extension') state.tasks.push({ task_id: 'task-extension', title: '大学生创新训练项目申报', status: 'pending', due_at: '2026-09-15T23:59:00+08:00', due_display: '9 月 15 日 23:59', platform: '创新训练项目系统', source: '教务处', action_id: 'action-extension' });
+    return Promise.resolve(clone(writeState(state)));
+  },
+  getDemoState() { return Promise.resolve(clone(readState())); },
   getDemoScenario(name) { const scenario = scenarios[name] || scenarios.student; return Promise.resolve(clone(scenario)); },
   getTasks() { return Promise.resolve({ tasks: clone(readState().tasks) }); },
-  createDocument(text) { const state = readState(); const id = uniqueId('doc'); const scenario = pickScenario(text); state.documents[id] = { document_id: id, text, scenario }; state.scenario = scenario; writeState(state); return Promise.resolve({ document: clone(state.documents[id]) }); },
+  createDocument(text) { const state = readState(); const id = uniqueId('doc'); const scenario = pickScenario(text); state.documents[id] = { document_id: id, text, scenario }; writeState(state); return Promise.resolve({ document: clone(state.documents[id]) }); },
   uploadMediaDocument() { return this.createDocument(scenarios.student.source); },
   parseDocument(documentId) { const state = readState(); const jobId = uniqueId('job'); state.jobs[jobId] = { parse_job_id: jobId, document_id: documentId, status: 'queued', result: null }; state.pollCount[jobId] = 0; writeState(state); return Promise.resolve(clone(state.jobs[jobId])); },
-  getParseJob(jobId) { const state = readState(); const job = state.jobs[jobId]; if (!job) return Promise.reject(new Error('job not found')); state.pollCount[jobId] += 1; if (state.pollCount[jobId] >= 2) { const document = state.documents[job.document_id] || {}; const scenarioName = document.scenario || state.scenario; const scenario = scenarios[scenarioName] || scenarios.student; job.status = 'succeeded'; job.result = { document_assessment: clone(scenario.assessment), verified_actions: clone(scenario.actions), source_text: scenario.source, scenario: scenarioName }; } writeState(state); return Promise.resolve(clone(job)); },
+  getParseJob(jobId) { const state = readState(); const job = state.jobs[jobId]; if (!job) return Promise.reject(new Error('job not found')); state.pollCount[jobId] += 1; if (state.pollCount[jobId] >= 2) { const document = state.documents[job.document_id] || {}; const scenarioName = document.scenario || 'student'; const scenario = scenarios[scenarioName] || scenarios.student; job.status = 'succeeded'; job.result = { document_assessment: clone(scenario.assessment), verified_actions: clone(scenario.actions), source_text: scenario.source, scenario: scenarioName }; } writeState(state); return Promise.resolve(clone(job)); },
   confirmAction(actionId) { return Promise.resolve({ action: { action_id: actionId, verification_status: 'confirmed' } }); },
   rejectAction() { return Promise.resolve({ ok: true }); },
   createTask(actionId) { const state = readState(); const action = findAction(actionId); if (!action) return Promise.reject(new Error('action not found')); let task = state.tasks.find((item) => item.action_id === actionId); if (!task) { task = { task_id: uniqueId('task'), title: action.title, status: 'pending', due_at: action.deadline.value, due_display: action.deadline.display, platform: action.platform, source: action.source, action_id: action.action_id }; state.tasks.unshift(task); } writeState(state); return Promise.resolve({ task: clone(task) }); },

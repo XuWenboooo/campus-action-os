@@ -46,7 +46,8 @@ Page({
         this.polls = next;
         this.setStep(next);
         if (job.status === 'succeeded') {
-          setTimeout(() => wx.redirectTo({ url: `/pages/action-result/action-result?jobId=${this.jobId}` }), 350);
+          const target = result.scenario === 'extension' ? `/pages/diff/diff?scenario=${result.scenario}` : `/pages/action-result/action-result?jobId=${this.jobId}`;
+          setTimeout(() => wx.redirectTo({ url: target }), 350);
         }
         if (['queued', 'running'].includes(job.status))
           this.timer = setTimeout(() => this.loadJob(), 1000);

@@ -17,8 +17,7 @@ Page({
   },
   onLoad(options) {
     if (options && options.scenario) {
-      this.setData({ scenario: options.scenario });
-      api.getDemoScenario(options.scenario).then((scenario) => this.setData({ text: scenario.source, scenarioLabel: scenario.label }));
+      this.prepareDemo(options.scenario);
     }
   },
   onInput(event) {
@@ -26,7 +25,11 @@ Page({
   },
   loadScenario(event) {
     const scenario = event.currentTarget.dataset.scenario;
-    api.getDemoScenario(scenario).then((result) => this.setData({ scenario, scenarioLabel: result.label, text: result.source, error: '' }));
+    this.prepareDemo(scenario);
+  },
+  prepareDemo(scenario) {
+    this.setData({ scenario, error: '' });
+    api.enterDemoScenario(scenario).then(() => api.getDemoScenario(scenario)).then((result) => this.setData({ scenarioLabel: result.label, text: result.source }));
   },
   chooseFile() {
     wx.chooseMessageFile({

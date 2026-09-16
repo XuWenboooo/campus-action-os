@@ -41,6 +41,18 @@ module.exports = {
     if (appConfig().useMock) return require('./mock').getTasks();
     return request('/tasks');
   },
+  resetDemoState() {
+    if (appConfig().useMock) return require('./mock').resetDemoState();
+    return Promise.resolve({ mode: 'BASELINE' });
+  },
+  enterDemoScenario(name) {
+    if (appConfig().useMock) return require('./mock').enterDemoScenario(name);
+    return Promise.resolve({ mode: `DEMO_${String(name).toUpperCase()}` });
+  },
+  getDemoState() {
+    if (appConfig().useMock) return require('./mock').getDemoState();
+    return Promise.resolve({ mode: 'REAL_API' });
+  },
   createDocument(text) {
     if (appConfig().useMock) return require('./mock').createDocument(text);
     return request('/documents', {

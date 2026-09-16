@@ -8,6 +8,8 @@ function appConfig() {
   };
 }
 
+const { formatDeadline, homeBucket } = require('./deadline');
+
 function apiError(code, message, details) {
   return { error: { code, message, details } };
 }
@@ -20,23 +22,13 @@ function unsupportedRealCapability(capability) {
   );
 }
 
-function displayDeadline(value) {
-  if (!value) return '待确认';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return `${date.getMonth() + 1}月${date.getDate()}日 ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
-}
-
 function enrichTask(task, action) {
-  const dueAt = task.due_at ? new Date(task.due_at) : null;
-  const now = new Date();
-  const today = dueAt && dueAt.toDateString() === now.toDateString();
-  const horizon = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000);
+  const precision = action && action.deadline && action.deadline.precision;
   return {
     ...task,
     action,
-    home_bucket: today ? 'today' : dueAt && dueAt > now && dueAt <= horizon ? 'upcoming' : 'later',
-    due_display: displayDeadline(task.due_at),
+    home_bucket: homeBucket(task.due_at, precision),
+    due_display: formatDeadline(task.due_at, precision),
     source: '通知原文',
     platform: action && action.platform && action.platform.value ? action.platform.value : '待确认',
   };
@@ -364,4 +356,5 @@ module.exports = {
     return appConfig().useMock && appConfig().demoMode;
   },
 };
+
 

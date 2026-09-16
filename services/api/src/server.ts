@@ -20,6 +20,7 @@ import { AudioPipelineError, transcribeAudio } from '../../audio-intelligence/sr
 import { createLocalAsrFailover } from '../../audio-intelligence/src/asr.js';
 import type { AsrProvider, VoiceToTranscriptResult } from '../../audio-intelligence/src/types.js';
 import { Repository, RepositoryError } from './repository.js';
+import { propagateSpokenRevisionDeadlines } from './spoken-deadline-propagation.js';
 
 const port = Number(process.env.API_PORT ?? 3000);
 const parserUrl = process.env.AI_SERVICE_URL ?? 'http://localhost:3001';
@@ -409,7 +410,13 @@ async function parseAudioTranscript(
       audio_id: transcript.audio_id,
       raw_audio_hash: transcript.provenance.raw_audio_hash,
     });
-  const valid = validateTextParseResponseAgainstText(parsed, sourceText);
+  const propagated = propagateSpokenRevisionDeadlines(
+    parsed,
+    sourceText,
+    input,
+    transcript.spoken_revisions,
+  );
+  const valid = validateTextParseResponseAgainstText(propagated, sourceText);
   if (!valid.ok)
     throw new AudioPipelineError(
       'ACTION_COMPILER_FAILED',
@@ -1408,4 +1415,5 @@ export function createApiServer(options: ApiServerOptions = {}): {
 if (process.argv[1]?.replaceAll('\\', '/').endsWith('services/api/src/server.ts')) {
   createApiServer().server.listen(port, () => console.log(`API listening on ${port}`));
 }
+
 

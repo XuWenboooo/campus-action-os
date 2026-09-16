@@ -1,18 +1,12 @@
 const api = require('../../utils/api');
-
-function displayDeadline(value) {
-  if (!value) return '待确认';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return `${date.getMonth() + 1}月${date.getDate()}日 ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
-}
+const { formatDeadline } = require('../../utils/deadline');
 
 function actionView(action) {
   if (!action) return null;
   const deadline = action.deadline || {};
   const claimValue = (claim) => (claim && claim.value ? claim.value : '');
   return {
-    deadline: deadline.display || displayDeadline(deadline.value),
+    deadline: deadline.display || formatDeadline(deadline.value, deadline.precision),
     platform: claimValue(action.platform) || action.platform || '待确认',
     audience: (action.target_population || []).join('、') || action.audience || '待确认',
     condition:
@@ -114,4 +108,5 @@ Page({
     });
   },
 });
+
 

@@ -669,10 +669,15 @@ async function handle(
     const bytes = audioUpload(body.content_base64, filename, body.contentType);
     let transcript: VoiceToTranscriptResult;
     try {
+      const maxSilenceMs = Number(process.env.ASR_VAD_MAX_SILENCE_MS ?? 20_000);
       transcript = await transcribeAudio(bytes, options.audioProvider ?? audioModelProvider(), {
         content_type: body.contentType === 'audio/x-wav' ? 'audio/wav' : 'audio/wav',
         audio_id: `audio-${randomUUID()}`,
         request_id: requestId,
+        vad:
+          Number.isFinite(maxSilenceMs) && maxSilenceMs > 0
+            ? { max_silence_ms: maxSilenceMs }
+            : undefined,
       });
     } catch (error) {
       if (error instanceof AudioPipelineError)

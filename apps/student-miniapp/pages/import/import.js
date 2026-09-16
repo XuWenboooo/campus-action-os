@@ -34,13 +34,17 @@ Page({
       return;
     }
     this.setData({ scenario, error: '' });
-    api.enterDemoScenario(scenario).then(() => api.getDemoScenario(scenario)).then((result) => this.setData({ scenarioLabel: result.label, text: result.source })).catch(() => this.setData({ error: '示例通知读取失败，请检查 Demo 模式。' }));
+    api
+      .enterDemoScenario(scenario)
+      .then(() => api.getDemoScenario(scenario))
+      .then((result) => this.setData({ scenarioLabel: result.label, text: result.source }))
+      .catch(() => this.setData({ error: '示例通知读取失败，请检查 Demo 模式。' }));
   },
   chooseFile() {
     wx.chooseMessageFile({
       count: 1,
       type: 'file',
-      extension: ['png', 'jpg', 'jpeg', 'pdf'],
+      extension: ['png', 'jpg', 'jpeg', 'pdf', 'wav'],
       success: (result) => {
         const file = result.tempFiles && result.tempFiles[0];
         const name = (file && file.name) || '';
@@ -52,9 +56,13 @@ Page({
               ? 'image/jpeg'
               : extension === 'pdf'
                 ? 'application/pdf'
-                : '';
+                : extension === 'wav'
+                  ? 'audio/wav'
+                  : '';
         if (!file || !file.path || !fileType) {
-          this.setData({ error: '只支持 PNG/JPEG 图片或 PDF 文件。' });
+          this.setData({
+            error: '当前真实音频入口只支持 WAV；同时支持 PNG/JPEG 图片或 PDF 文件。',
+          });
           return;
         }
         this.setData({ filePath: file.path, fileName: name, fileType, error: '' });
@@ -73,10 +81,29 @@ Page({
   },
   submit() {
     if (!this.data.text.trim() && !this.data.filePath) {
-      this.setData({ error: '请先粘贴通知原文，或选择 PNG/JPEG/PDF 文件。' });
+      this.setData({ error: '请先粘贴通知原文，或选择 PNG/JPEG/PDF/WAV 文件。' });
       return;
     }
     this.setData({ loading: true, error: '' });
+    if (this.data.filePath && this.data.fileType === 'audio/wav') {
+      api
+        .uploadAudioDocument(this.data.filePath, this.data.fileType, this.data.fileName)
+        .then((result) =>
+          wx.redirectTo({
+            url: `/pages/parse/parse?jobId=${result.parse_job.parse_job_id}&audioId=${result.audio.audio_id}`,
+          }),
+        )
+        .catch((error) =>
+          this.setData({
+            loading: false,
+            error:
+              error && error.error && error.error.code === 'NETWORK_ERROR'
+                ? '导入失败，请检查 API 地址与网络。'
+                : '语音识别失败，请确认 WAV 文件与本地识别服务可用。',
+          }),
+        );
+      return;
+    }
     api[this.data.filePath ? 'uploadMediaDocument' : 'createDocument'](
       ...(this.data.filePath
         ? [this.data.filePath, this.data.fileType, this.data.fileName]
@@ -126,3 +153,4 @@ Page({
       .catch(() => this.setData({ loading: false, error: '人工任务创建失败，请确认后重试。' }));
   },
 });
+

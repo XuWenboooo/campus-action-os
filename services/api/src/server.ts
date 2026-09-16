@@ -9,11 +9,16 @@ import {
   type Document,
   type NotificationRevision,
   type Task,
+  type TextParseRequest,
   type UserProfile,
   type VerifiedActionObject,
 } from '@campus-action-os/protocol';
 import { normalizeDocument } from '../../ai-parser/src/document-normalizer.js';
+import { parseText } from '../../ai-parser/src/rule-parser.js';
 import type { OcrProvider } from '../../ai-parser/src/ocr.js';
+import { AudioPipelineError, transcribeAudio } from '../../audio-intelligence/src/pipeline.js';
+import { createLocalAsrFailover } from '../../audio-intelligence/src/asr.js';
+import type { AsrProvider, VoiceToTranscriptResult } from '../../audio-intelligence/src/types.js';
 import { Repository, RepositoryError } from './repository.js';
 
 const port = Number(process.env.API_PORT ?? 3000);
@@ -26,6 +31,7 @@ type ApiServerOptions = {
   environment?: string;
   requestTimeoutMs?: number;
   ocrProvider?: OcrProvider;
+  audioProvider?: AsrProvider;
 };
 
 function requestIdFor(request: IncomingMessage): string {
@@ -55,13 +61,13 @@ function assertAllowedFields(body: Body, allowed: readonly string[]): void {
     );
 }
 
-async function readJson(request: IncomingMessage): Promise<unknown> {
+async function readJson(request: IncomingMessage, maxBytes = 1_100_000): Promise<unknown> {
   const chunks: Buffer[] = [];
   let length = 0;
   for await (const chunk of request) {
     const buffer = Buffer.from(chunk);
     length += buffer.length;
-    if (length > 1_100_000)
+    if (length > maxBytes)
       throw new RepositoryError('TEXT_TOO_LARGE', 413, 'Request body too large');
     chunks.push(buffer);
   }
@@ -305,11 +311,125 @@ async function parseDocument(
   repository.completeParseJob(userId, parseJobId, valid.value, requestId);
 }
 
+type AudioRuntimeRecord = {
+  userId: string;
+  bytes: Uint8Array;
+  result: VoiceToTranscriptResult;
+  actionIds: string[];
+};
+
+function audioModelProvider(): AsrProvider {
+  return createLocalAsrFailover({
+    primary: {
+      model_dir: process.env.SENSEVOICE_MODEL_DIR ?? '',
+      python_command: process.env.ASR_PYTHON_COMMAND ?? 'python',
+      device: process.env.ASR_DEVICE ?? 'cpu',
+      compute_type: process.env.ASR_COMPUTE_TYPE ?? 'int8',
+    },
+    fallback: {
+      model_dir: process.env.FASTER_WHISPER_MODEL_DIR ?? '',
+      python_command: process.env.ASR_PYTHON_COMMAND ?? 'python',
+      device: process.env.ASR_DEVICE ?? 'cpu',
+      compute_type: process.env.ASR_COMPUTE_TYPE ?? 'int8',
+    },
+  });
+}
+
+function audioUpload(value: unknown, filename: string, declaredType: unknown): Uint8Array {
+  const extension = filename.toLowerCase().split('.').pop();
+  const normalizedType = declaredType === 'audio/x-wav' ? 'audio/wav' : declaredType;
+  if (normalizedType !== 'audio/wav' && !(normalizedType === undefined && extension === 'wav'))
+    throw new RepositoryError(
+      'AUDIO_UNSUPPORTED_FORMAT',
+      415,
+      '当前真实音频入口只接受 WAV；M4A/MP3 尚未开放',
+    );
+  if (typeof value !== 'string' || value.length % 4 !== 0)
+    throw new RepositoryError('INVALID_REQUEST', 400, 'content_base64 must be canonical Base64');
+  if (!/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(value))
+    throw new RepositoryError('INVALID_REQUEST', 400, 'content_base64 must be canonical Base64');
+  const content = Buffer.from(value, 'base64');
+  if (content.byteLength === 0)
+    throw new RepositoryError('EMPTY_FILE', 400, 'Audio upload cannot be empty');
+  const maxBytes = 8_000_000;
+  if (content.byteLength > maxBytes)
+    throw new RepositoryError(
+      'TEXT_TOO_LARGE',
+      413,
+      `Audio upload must be at most ${maxBytes} bytes`,
+    );
+  if (content.toString('base64') !== value)
+    throw new RepositoryError('INVALID_REQUEST', 400, 'content_base64 must be canonical Base64');
+  return content;
+}
+
+async function parseAudioTranscript(
+  repository: Repository,
+  userId: string,
+  document: Document,
+  parseJobId: string,
+  requestId: string,
+  transcript: VoiceToTranscriptResult,
+  environment: string,
+): Promise<Exclude<ReturnType<typeof parseText>, { code: string }>> {
+  const sourceText = transcript.transcript_segments
+    .map((segment) => segment.text.trim())
+    .join('\n');
+  const storedProfile = repository.getProfile(userId);
+  const {
+    schema_version: _schemaVersion,
+    profile_id: _profileId,
+    updated_at: _updatedAt,
+    ...profile
+  } = storedProfile;
+  const input: TextParseRequest = {
+    schema_version: 'text-parse-request/v1',
+    request_id: requestId,
+    idempotency_key: `audio-parse-job:${parseJobId}`,
+    protocol_version: protocolVersion,
+    document: {
+      document_id: document.document_id,
+      content_type: 'text/plain',
+      text: sourceText,
+      content_sha256: createHash('sha256').update(sourceText, 'utf8').digest('hex'),
+      language: 'zh-CN',
+      timezone: 'Asia/Shanghai',
+    },
+    user_profile: profile,
+    execution_context: {
+      environment: environment === 'production' ? 'production' : 'local',
+      deadline_ms: Number(process.env.API_REQUEST_TIMEOUT_MS ?? 5000),
+      requested_at: new Date().toISOString(),
+    },
+  };
+  const parsed = parseText(input);
+  if ('code' in parsed)
+    throw new AudioPipelineError('ACTION_COMPILER_FAILED', parsed.message, {
+      request_id: requestId,
+      audio_id: transcript.audio_id,
+      raw_audio_hash: transcript.provenance.raw_audio_hash,
+    });
+  const valid = validateTextParseResponseAgainstText(parsed, sourceText);
+  if (!valid.ok)
+    throw new AudioPipelineError(
+      'ACTION_COMPILER_FAILED',
+      'Action Compiler evidence alignment failed',
+      {
+        request_id: requestId,
+        audio_id: transcript.audio_id,
+        raw_audio_hash: transcript.provenance.raw_audio_hash,
+      },
+    );
+  repository.completeParseJob(userId, parseJobId, valid.value, requestId);
+  return valid.value;
+}
+
 async function handle(
   request: IncomingMessage,
   response: ServerResponse,
   options: ApiServerOptions,
   repository: Repository,
+  audioRuntime: Map<string, AudioRuntimeRecord>,
 ): Promise<void> {
   const requestId = requestIdFor(request);
   const parsedUrl = new URL(request.url ?? '/', 'http://localhost');
@@ -335,7 +455,10 @@ async function handle(
     publicHealthRoute || (environment === 'production' && devLoginRoute)
       ? 'anonymous'
       : currentUser(request, repository);
-  const body = request.method === 'GET' ? {} : bodyObject(await readJson(request));
+  const body =
+    request.method === 'GET'
+      ? {}
+      : bodyObject(await readJson(request, path === '/documents/audio' ? 6_000_000 : undefined));
   const parserBaseUrl = options.parserUrl ?? parserUrl;
 
   if (request.method === 'GET' && path === '/health') {
@@ -517,6 +640,131 @@ async function handle(
     const output = { document };
     repository.saveIdempotency(userId, path, key, hash, 201, output);
     send(response, 201, output, requestId);
+    return;
+  }
+
+  if (request.method === 'POST' && path === '/documents/audio') {
+    assertAllowedFields(body, [
+      'title',
+      'filename',
+      'contentType',
+      'content_base64',
+      'data_origin',
+      'idempotencyKey',
+    ]);
+    const key = idempotencyKey(request, body);
+    const hash = requestHash(body);
+    const previous = repository.getIdempotency(userId, path, key, hash);
+    if (previous === 'conflict')
+      throw new RepositoryError(
+        'IDEMPOTENCY_CONFLICT',
+        409,
+        'Idempotency key was reused with a different request',
+      );
+    if (previous) {
+      send(response, previous.status, previous.body, requestId);
+      return;
+    }
+    const filename = stringField(body, 'filename', false) ?? 'voice.wav';
+    const bytes = audioUpload(body.content_base64, filename, body.contentType);
+    let transcript: VoiceToTranscriptResult;
+    try {
+      transcript = await transcribeAudio(bytes, options.audioProvider ?? audioModelProvider(), {
+        content_type: body.contentType === 'audio/x-wav' ? 'audio/wav' : 'audio/wav',
+        audio_id: `audio-${randomUUID()}`,
+        request_id: requestId,
+      });
+    } catch (error) {
+      if (error instanceof AudioPipelineError)
+        throw new RepositoryError(
+          error.code,
+          error.code.startsWith('AUDIO_') ? 400 : 503,
+          error.message,
+          true,
+        );
+      throw error;
+    }
+    const document = repository.createDocument({
+      ownerUserId: userId,
+      title: stringField(body, 'title', false) ?? filename,
+      contentType: 'text/plain',
+      text: transcript.transcript_segments.map((segment) => segment.text.trim()).join('\n'),
+      dataOrigin: dataOrigin(body.data_origin),
+    });
+    const job = repository.createParseJob(userId, document.document_id, requestId, key, hash);
+    repository.startParseJob(userId, job.parseJobId, requestId);
+    let parsed;
+    try {
+      parsed = await parseAudioTranscript(
+        repository,
+        userId,
+        document,
+        job.parseJobId,
+        requestId,
+        transcript,
+        environment,
+      );
+    } catch (error) {
+      if (repository.getParseJob(userId, job.parseJobId)?.status === 'running')
+        repository.failParseJob(userId, job.parseJobId, error, requestId);
+      if (error instanceof AudioPipelineError)
+        throw new RepositoryError(
+          error.code,
+          error.code.startsWith('AUDIO_') ? 400 : 503,
+          error.message,
+          true,
+        );
+      throw error;
+    }
+    const output = {
+      document,
+      parse_job: jobResponse(repository, userId, job.parseJobId),
+      audio: {
+        audio_id: transcript.audio_id,
+        info: transcript.info,
+        provenance: transcript.provenance,
+        asr_provider: transcript.asr_provider,
+        transcript_segments: transcript.transcript_segments,
+        audio_evidence: transcript.audio_evidence,
+        spoken_revisions: transcript.spoken_revisions,
+      },
+    };
+    audioRuntime.set(transcript.audio_id, {
+      userId,
+      bytes,
+      result: transcript,
+      actionIds: parsed.verified_actions.map((action) => action.action_id),
+    });
+    repository.saveIdempotency(userId, path, key, hash, 201, output);
+    send(response, 201, output, requestId);
+    return;
+  }
+
+  if (request.method === 'GET' && segments[0] === 'audio' && segments[1] && segments.length === 2) {
+    const record = audioRuntime.get(segments[1]);
+    if (!record || record.userId !== userId)
+      throw new RepositoryError('AUDIO_NOT_FOUND', 404, 'Audio not found');
+    response.setHeader('x-request-id', requestId);
+    response.setHeader('content-type', 'audio/wav');
+    response.setHeader('content-length', String(record.bytes.byteLength));
+    response.writeHead(200).end(Buffer.from(record.bytes));
+    return;
+  }
+
+  if (
+    request.method === 'GET' &&
+    segments[0] === 'actions' &&
+    segments[1] &&
+    segments[2] === 'audio-evidence'
+  ) {
+    if (!repository.getAction(userId, segments[1]))
+      throw new RepositoryError('ACTION_NOT_FOUND', 404, 'Action not found');
+    const record = [...audioRuntime.values()].find(
+      (candidate) => candidate.userId === userId && candidate.actionIds.includes(segments[1]),
+    );
+    if (!record)
+      throw new RepositoryError('AUDIO_EVIDENCE_NOT_FOUND', 404, 'Audio evidence not found');
+    send(response, 200, record.result, requestId);
     return;
   }
   if (
@@ -1131,10 +1379,11 @@ export function createApiServer(options: ApiServerOptions = {}): {
   repository: Repository;
 } {
   const repository = options.repository ?? new Repository();
+  const audioRuntime = new Map<string, AudioRuntimeRecord>();
   const server = createServer((request, response) => {
     const requestId = requestIdFor(request);
     response.setHeader('x-request-id', requestId);
-    void handle(request, response, options, repository).catch((error: unknown) => {
+    void handle(request, response, options, repository, audioRuntime).catch((error: unknown) => {
       const requestId = response.getHeader('x-request-id')?.toString() ?? randomUUID();
       const domainError =
         error instanceof RepositoryError
@@ -1154,3 +1403,4 @@ export function createApiServer(options: ApiServerOptions = {}): {
 if (process.argv[1]?.replaceAll('\\', '/').endsWith('services/api/src/server.ts')) {
   createApiServer().server.listen(port, () => console.log(`API listening on ${port}`));
 }
+

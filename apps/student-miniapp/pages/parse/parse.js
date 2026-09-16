@@ -21,6 +21,17 @@ Page({
   },
   onLoad(options) {
     this.jobId = options.jobId;
+    this.audioId = options.audioId || '';
+    if (this.audioId)
+      this.setData({
+        steps: [
+          { label: '读取录音', done: false, active: false },
+          { label: '语音识别', done: false, active: false },
+          { label: '编译行动', done: false, active: false },
+          { label: '证据核验', done: false, active: false },
+          { label: '等待确认', done: false, active: false },
+        ],
+      });
     this.setStep(0);
     this.loadJob();
   },
@@ -36,24 +47,45 @@ Page({
           job,
           assessment: result.document_assessment || null,
           actions: result.verified_actions || [],
-          resultReady: ['succeeded', 'partial', 'needs_confirmation', 'failed'].includes(job.status),
+          resultReady: ['succeeded', 'partial', 'needs_confirmation', 'failed'].includes(
+            job.status,
+          ),
           canManual: job.status === 'failed',
           error: '',
         });
-        const next = ['succeeded', 'partial', 'needs_confirmation'].includes(job.status) ? 6 : Math.min(5, (this.polls || 0) + 1);
+        const next = ['succeeded', 'partial', 'needs_confirmation'].includes(job.status)
+          ? this.data.steps.length
+          : Math.min(this.data.steps.length - 1, (this.polls || 0) + 1);
         this.polls = next;
         this.setStep(next);
-        if (['succeeded', 'partial', 'needs_confirmation'].includes(job.status) && (result.verified_actions || []).length) {
-          const target = result.scenario === 'extension' ? `/pages/diff/diff?scenario=${result.scenario}` : `/pages/action-result/action-result?jobId=${this.jobId}`;
+        if (
+          ['succeeded', 'partial', 'needs_confirmation'].includes(job.status) &&
+          (result.verified_actions || []).length
+        ) {
+          const target =
+            result.scenario === 'extension'
+              ? `/pages/diff/diff?scenario=${result.scenario}`
+              : `/pages/action-result/action-result?jobId=${this.jobId}${this.audioId ? `&audioId=${this.audioId}` : ''}`;
           setTimeout(() => wx.redirectTo({ url: target }), 350);
         }
         if (['queued', 'running'].includes(job.status))
           this.timer = setTimeout(() => this.loadJob(), 1000);
       })
-      .catch((error) => this.setData({ error: error && error.error && error.error.code === 'NETWORK_ERROR' ? '解析服务连接失败，请检查 API 地址。' : '解析任务读取失败，请稍后重试。' }));
+      .catch((error) =>
+        this.setData({
+          error:
+            error && error.error && error.error.code === 'NETWORK_ERROR'
+              ? '解析服务连接失败，请检查 API 地址。'
+              : '解析任务读取失败，请稍后重试。',
+        }),
+      );
   },
   setStep(index) {
-    const steps = this.data.steps.map((step, current) => ({ ...step, done: current < index, active: current === index }));
+    const steps = this.data.steps.map((step, current) => ({
+      ...step,
+      done: current < index,
+      active: current === index,
+    }));
     this.setData({ steps });
   },
   confirm(event) {
@@ -96,3 +128,4 @@ Page({
       .catch(() => this.setData({ error: '人工任务创建失败，请确认后重试。' }));
   },
 });
+

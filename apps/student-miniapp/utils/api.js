@@ -14,11 +14,9 @@ function apiError(code, message, details) {
 
 function unsupportedRealCapability(capability) {
   return Promise.reject(
-    apiError(
-      'REAL_API_NOT_AVAILABLE',
-      `${capability} 当前没有可用的学生端真实 API。`,
-      { capability },
-    ),
+    apiError('REAL_API_NOT_AVAILABLE', `${capability} 当前没有可用的学生端真实 API。`, {
+      capability,
+    }),
   );
 }
 
@@ -87,7 +85,9 @@ module.exports = {
     return request('/tasks').then((result) =>
       Promise.all(
         (result.tasks || []).map((task) =>
-          request(`/actions/${task.action_id}`).then((actionResult) => enrichTask(task, actionResult.action)),
+          request(`/actions/${task.action_id}`).then((actionResult) =>
+            enrichTask(task, actionResult.action),
+          ),
         ),
       ).then((tasks) => ({ ...result, tasks })),
     );
@@ -146,7 +146,8 @@ module.exports = {
     });
   },
   uploadMediaDocument(filePath, contentType, title) {
-    if (appConfig().useMock) return require('./mock').uploadMediaDocument(filePath, contentType, title);
+    if (appConfig().useMock)
+      return require('./mock').uploadMediaDocument(filePath, contentType, title);
     return new Promise((resolve, reject) => {
       wx.getFileSystemManager().readFile({
         filePath,
@@ -158,6 +159,30 @@ module.exports = {
             data: {
               title: title || '微信导入通知',
               contentType,
+              content_base64: file.data,
+              data_origin: 'user_provided',
+            },
+          }).then(resolve, reject);
+        },
+        fail: reject,
+      });
+    });
+  },
+  uploadAudioDocument(filePath, contentType, title) {
+    if (appConfig().useMock)
+      return require('./mock').uploadMediaDocument(filePath, contentType, title);
+    return new Promise((resolve, reject) => {
+      wx.getFileSystemManager().readFile({
+        filePath,
+        encoding: 'base64',
+        success(file) {
+          request('/documents/audio', {
+            method: 'POST',
+            idempotencyKey: key('audio-upload'),
+            data: {
+              title: title || '微信录音通知',
+              filename: title || 'voice.wav',
+              contentType: contentType || 'audio/wav',
               content_base64: file.data,
               data_origin: 'user_provided',
             },
@@ -263,8 +288,32 @@ module.exports = {
     if (appConfig().useMock) return require('./mock').getEvidence(actionId);
     return request(`/actions/${actionId}`).then((result) => ({
       action: result.action,
-      source_text: (result.action.evidence || []).map((item) => item.source_text).filter(Boolean).join('\n'),
+      source_text: (result.action.evidence || [])
+        .map((item) => item.source_text)
+        .filter(Boolean)
+        .join('\n'),
     }));
+  },
+  getAudioEvidence(actionId) {
+    if (appConfig().useMock)
+      return Promise.reject(apiError('AUDIO_EVIDENCE_NOT_FOUND', '当前行动没有语音依据。'));
+    return request(`/actions/${actionId}/audio-evidence`);
+  },
+  downloadAudioEvidence(audioId) {
+    if (appConfig().useMock)
+      return Promise.reject(apiError('AUDIO_NOT_FOUND', '当前没有可播放的语音。'));
+    const config = appConfig();
+    return new Promise((resolve, reject) => {
+      wx.downloadFile({
+        url: `${config.baseUrl}/audio/${audioId}`,
+        header: { 'x-dev-user-id': config.userId },
+        success(result) {
+          if (result.statusCode >= 200 && result.statusCode < 300) resolve(result.tempFilePath);
+          else reject(apiError('AUDIO_NOT_FOUND', '语音依据读取失败。'));
+        },
+        fail: reject,
+      });
+    });
   },
   getTask(taskId) {
     if (appConfig().useMock) return require('./mock').getTask(taskId);
@@ -281,7 +330,8 @@ module.exports = {
     if (!this._diffTaskId || !changeEventId) return unsupportedRealCapability('通知变化详情');
     return request(`/tasks/${this._diffTaskId}/notice-sync`).then((result) => {
       const event = (result.sync || []).find((item) => item.sync_event_id === changeEventId);
-      if (!event) return Promise.reject(apiError('SYNC_EVENT_NOT_FOUND', '待处理的通知变化不存在。'));
+      if (!event)
+        return Promise.reject(apiError('SYNC_EVENT_NOT_FOUND', '待处理的通知变化不存在。'));
       return {
         ...event,
         change_event_id: event.sync_event_id,
@@ -314,3 +364,4 @@ module.exports = {
     return appConfig().useMock && appConfig().demoMode;
   },
 };
+

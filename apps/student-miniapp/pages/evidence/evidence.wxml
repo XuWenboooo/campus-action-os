@@ -14,5 +14,12 @@
       <view class="reason">此行动依据该句生成</view>
     </view>
   </view>
+  <view class="section-title" wx:if="{{audioEvidence.length}}">语音依据 <text class="caption">来自真实录音</text></view>
+  <view class="card audio-evidence" wx:for="{{audioEvidence}}" wx:key="evidence_id">
+    <view class="caption">{{item.start_ms}}ms – {{item.end_ms}}ms · {{item.asr_provider}}</view>
+    <view class="quote">“{{item.transcript_text}}”</view>
+    <button class="button secondary" loading="{{audioLoading}}" disabled="{{audioLoading}}" bindtap="playAudio" data-id="{{item.evidence_id}}">▶ 播放语音依据</button>
+  </view>
   <view class="danger" wx:if="{{error}}">{{error}}</view>
 </view>
+

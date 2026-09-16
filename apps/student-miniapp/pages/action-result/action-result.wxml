@@ -24,8 +24,14 @@
     <view class="divider"></view>
     <view class="why-row" bindtap="openEvidence"><view><view class="why-title">为什么？</view><view class="muted">每个判断都有原文依据</view></view><text class="why-arrow">→</text></view>
   </view>
+  <view class="card" wx:if="{{!orchestration && extraActions.length}}">
+    <view class="caption">附加要求</view>
+    <view class="action-title" wx:for="{{extraActions}}" wx:key="action_id">{{item.title}}</view>
+    <view class="muted">确认后将一并创建任务。</view>
+  </view>
   <view class="section-title" wx:if="{{!orchestration && action && action.steps.length > 1}}">Action Graph <text class="caption">行动路径</text></view>
   <view class="graph" wx:if="{{!orchestration && actionView && actionView.steps.length > 1}}"><view class="graph-step" wx:for="{{actionView.steps}}" wx:key="*this"><view class="graph-number">0{{index + 1}}</view><view><view class="field-value">{{item}}</view><view class="caption">待完成</view></view></view></view>
   <view class="danger" wx:if="{{error}}">{{error}}</view>
   <view class="bottom-bar" wx:if="{{action && !orchestration}}"><button class="button" loading="{{creating}}" disabled="{{creating}}" bindtap="createTask">{{actionView.statusLabel === '有信息需要你确认' ? '确认信息并创建任务' : '确认并创建任务'}}</button><button class="button ghost" bindtap="reject">这不是我的任务</button></view>
 </view>
+

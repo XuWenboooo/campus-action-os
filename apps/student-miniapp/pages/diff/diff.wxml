@@ -6,6 +6,8 @@
   <view class="card" wx:if="{{diff}}">
     <view class="caption">{{diff.title}}</view>
     <view class="diff-field" wx:for="{{diff.fields}}" wx:key="label"><view class="field-label">{{item.label}}</view><view class="old-value"><text class="minus">−</text>{{item.oldValue}}</view><view class="change-line"><text class="change-arrow">↓</text><view class="line"></view></view><view class="new-value"><text class="plus">＋</text>{{item.newValue}}</view></view>
+    <view class="muted" wx:if="{{!diff.fields.length}}">当前后端已确认存在待处理同步事件，但尚未提供字段级通知详情。</view>
+    <view class="source" wx:if="{{diff.change_type}}">变化类型：{{diff.change_type}} · 状态：{{diff.status}}</view>
   </view>
   <view class="card source-card" wx:if="{{diff}}"><view class="caption">更新来源</view><view class="source-quote">“{{diff.source}}”</view><view class="evidence-link" bindtap="openEvidence">查看原文变化 →</view></view>
   <view class="section-title" wx:if="{{diff && diff.impacts.length}}">此次变更影响 <text class="caption">行动链同步</text></view>

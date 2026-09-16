@@ -4,7 +4,50 @@ function appConfig() {
     baseUrl: (app && app.globalData.apiBaseUrl) || 'http://127.0.0.1:3000',
     userId: (app && app.globalData.userId) || 'dev-user',
     useMock: Boolean(app && app.globalData.useMock),
+    demoMode: Boolean(app && app.globalData.demoMode),
   };
+}
+
+function apiError(code, message, details) {
+  return { error: { code, message, details } };
+}
+
+function unsupportedRealCapability(capability) {
+  return Promise.reject(
+    apiError(
+      'REAL_API_NOT_AVAILABLE',
+      `${capability} 当前没有可用的学生端真实 API。`,
+      { capability },
+    ),
+  );
+}
+
+function displayDeadline(value) {
+  if (!value) return '待确认';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return `${date.getMonth() + 1}月${date.getDate()}日 ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+}
+
+function enrichTask(task, action) {
+  const dueAt = task.due_at ? new Date(task.due_at) : null;
+  const now = new Date();
+  const today = dueAt && dueAt.toDateString() === now.toDateString();
+  const horizon = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000);
+  return {
+    ...task,
+    action,
+    home_bucket: today ? 'today' : dueAt && dueAt > now && dueAt <= horizon ? 'upcoming' : 'later',
+    due_display: displayDeadline(task.due_at),
+    source: '通知原文',
+    platform: action && action.platform && action.platform.value ? action.platform.value : '待确认',
+  };
+}
+
+function changeTypeLabel(changeType) {
+  if (changeType === 'postponed') return '截止时间延期，待确认';
+  if (changeType === 'revoked') return '通知撤回，待确认';
+  return '通知内容发生变化，待确认';
 }
 
 function request(path, options) {
@@ -27,7 +70,9 @@ function request(path, options) {
         }
         reject(response.data || { error: { code: 'HTTP_ERROR', message: 'Request failed' } });
       },
-      fail: reject,
+      fail(error) {
+        reject(apiError('NETWORK_ERROR', '无法连接真实 API。', error));
+      },
     });
   });
 }
@@ -39,31 +84,58 @@ function key(prefix) {
 module.exports = {
   getTasks() {
     if (appConfig().useMock) return require('./mock').getTasks();
-    return request('/tasks');
+    return request('/tasks').then((result) =>
+      Promise.all(
+        (result.tasks || []).map((task) =>
+          request(`/actions/${task.action_id}`).then((actionResult) => enrichTask(task, actionResult.action)),
+        ),
+      ).then((tasks) => ({ ...result, tasks })),
+    );
   },
   getPendingChanges() {
     if (appConfig().useMock) return require('./mock').getPendingChanges();
-    return request('/notification-changes?status=pending');
+    return this.getTasks().then(({ tasks }) =>
+      Promise.all(
+        tasks.map((task) =>
+          request(`/tasks/${task.task_id}/notice-sync`).then((result) =>
+            (result.sync || [])
+              .filter((event) => event.status === 'pending_review')
+              .map((event) => ({
+                change_event_id: event.sync_event_id,
+                sync_event_id: event.sync_event_id,
+                task_id: task.task_id,
+                task_title: task.title,
+                change_label: changeTypeLabel(event.change_type),
+                old_value: '',
+                new_value: '',
+                source: '关联通知',
+                status: 'pending',
+                change_type: event.change_type,
+              })),
+          ),
+        ),
+      ).then((groups) => ({ changes: groups.reduce((all, group) => all.concat(group), []) })),
+    );
   },
   getOrchestrationSummary() {
     if (appConfig().useMock) return require('./mock').getOrchestrationSummary();
-    return Promise.resolve({ suggestion: null, conflict: null, relations: [], change_impacts: [] });
+    return unsupportedRealCapability('行动编排');
   },
   getOrchestrationResult() {
     if (appConfig().useMock) return require('./mock').getOrchestrationResult();
-    return Promise.resolve({ orchestration: false, verified_actions: [] });
+    return unsupportedRealCapability('行动编排');
   },
   resetDemoState() {
     if (appConfig().useMock) return require('./mock').resetDemoState();
-    return Promise.resolve({ mode: 'BASELINE' });
+    return unsupportedRealCapability('Demo 状态重置');
   },
   enterDemoScenario(name) {
     if (appConfig().useMock) return require('./mock').enterDemoScenario(name);
-    return Promise.resolve({ mode: `DEMO_${String(name).toUpperCase()}` });
+    return unsupportedRealCapability('Demo 场景');
   },
   getDemoState() {
     if (appConfig().useMock) return require('./mock').getDemoState();
-    return Promise.resolve({ mode: 'REAL_API' });
+    return unsupportedRealCapability('Demo 状态读取');
   },
   createDocument(text) {
     if (appConfig().useMock) return require('./mock').createDocument(text);
@@ -189,26 +261,56 @@ module.exports = {
   },
   getEvidence(actionId) {
     if (appConfig().useMock) return require('./mock').getEvidence(actionId);
-    return request(`/actions/${actionId}/evidence`);
+    return request(`/actions/${actionId}`).then((result) => ({
+      action: result.action,
+      source_text: (result.action.evidence || []).map((item) => item.source_text).filter(Boolean).join('\n'),
+    }));
   },
   getTask(taskId) {
     if (appConfig().useMock) return require('./mock').getTask(taskId);
-    return request(`/tasks/${taskId}`);
+    return request(`/tasks/${taskId}`).then((result) =>
+      request(`/actions/${result.task.action_id}`).then((actionResult) => ({
+        ...result,
+        task: enrichTask(result.task, actionResult.action),
+        action: actionResult.action,
+      })),
+    );
   },
   getNotificationDiff(changeEventId) {
     if (appConfig().useMock) return require('./mock').getNotificationDiff(changeEventId);
-    return request(`/notifications/diff${changeEventId ? `?changeEventId=${encodeURIComponent(changeEventId)}` : ''}`);
+    if (!this._diffTaskId || !changeEventId) return unsupportedRealCapability('通知变化详情');
+    return request(`/tasks/${this._diffTaskId}/notice-sync`).then((result) => {
+      const event = (result.sync || []).find((item) => item.sync_event_id === changeEventId);
+      if (!event) return Promise.reject(apiError('SYNC_EVENT_NOT_FOUND', '待处理的通知变化不存在。'));
+      return {
+        ...event,
+        change_event_id: event.sync_event_id,
+        task_id: this._diffTaskId,
+        title: '关联通知发生变化',
+        source: '关联通知',
+        fields: [],
+        impacts: [],
+        details_available: false,
+      };
+    });
   },
   applyNotificationDiff(changeEventId) {
     if (appConfig().useMock) return require('./mock').applyNotificationDiff(changeEventId);
-    return request('/notifications/diff/apply', { method: 'POST', idempotencyKey: key('notification-diff'), data: { changeEventId, confirmed: true } });
+    if (!this._diffTaskId || !changeEventId) return unsupportedRealCapability('通知变化更新');
+    return this.resolveTaskNoticeSync(this._diffTaskId, changeEventId, 'accept');
   },
   dismissNotificationDiff(changeEventId) {
     if (appConfig().useMock) return require('./mock').dismissNotificationDiff(changeEventId);
-    return request('/notifications/diff/dismiss', { method: 'POST', idempotencyKey: key('notification-diff-dismiss'), data: { changeEventId, confirmed: true } });
+    return this.resolveTaskNoticeSync(this._diffTaskId, changeEventId, 'reject');
   },
   getDemoScenario(name) {
     if (appConfig().useMock) return require('./mock').getDemoScenario(name);
-    return Promise.resolve({ label: name, source: '' });
+    return unsupportedRealCapability('Demo 示例通知');
+  },
+  setDiffContext(taskId) {
+    this._diffTaskId = taskId;
+  },
+  isDemoMode() {
+    return appConfig().useMock && appConfig().demoMode;
   },
 };

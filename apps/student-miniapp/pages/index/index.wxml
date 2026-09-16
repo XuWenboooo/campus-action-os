@@ -5,7 +5,7 @@
   <view class="hero-stats">
     <view class="stat"><view class="stat-number">{{todayTasks.length}}</view><view class="caption">今天需要完成</view></view>
     <view class="stat"><view class="stat-number">{{upcomingTasks.length}}</view><view class="caption">未来 3 天</view></view>
-    <view class="stat alert"><view class="stat-number">{{changedTasks.length}}</view><view class="caption">发生变化</view></view>
+    <view class="stat alert"><view class="stat-number">{{changesUnavailable ? '—' : changedTasks.length}}</view><view class="caption">发生变化</view></view>
   </view>
   <orchestration-suggestion-card wx:if="{{orchestrationSuggestion}}" suggestion="{{orchestrationSuggestion}}" bind:open="openOrchestration"></orchestration-suggestion-card>
   <conflict-alert-card wx:if="{{conflictAlert}}" conflict="{{conflictAlert}}" bind:open="openConflict"></conflict-alert-card>
@@ -23,15 +23,17 @@
     <view class="source">{{item.platform}} · {{item.source}}</view>
   </view>
   <view class="section-title">Changed <text class="caption">有变化</text></view>
-  <view class="card change-card" wx:for="{{changedTasks}}" wx:key="change_event_id" bindtap="openDiff" data-id="{{item.change_event_id}}">
+  <view class="card empty" wx:if="{{changesUnavailable}}">当前真实 API 尚未提供通知变化列表。</view>
+  <view class="card change-card" wx:for="{{changedTasks}}" wx:key="change_event_id" bindtap="openDiff" data-id="{{item.change_event_id}}" data-task-id="{{item.task_id}}">
     <view class="row"><text class="tag red">通知有更新</text><text class="caption">刚刚发现</text></view>
     <view class="card-title">{{item.task_title}}</view>
     <view class="change-label">{{item.change_label}}</view>
-    <view class="diff-preview"><text class="strike">{{item.old_value}}</text><text class="arrow">→</text><text class="new-date">{{item.new_value}}</text></view>
+    <view class="diff-preview" wx:if="{{item.old_value || item.new_value}}"><text class="strike">{{item.old_value}}</text><text class="arrow">→</text><text class="new-date">{{item.new_value}}</text></view>
+    <view class="muted" wx:else>字段级变化待打开通知依据后核对</view>
     <view class="source">{{item.source}} · 查看变化 →</view>
   </view>
-  <view class="section-title">Try a scenario <text class="caption">现场演示</text></view>
-  <view class="demo-row">
+  <view class="section-title" wx:if="{{demoMode}}">Try a scenario <text class="caption">现场演示</text></view>
+  <view class="demo-row" wx:if="{{demoMode}}">
     <view class="demo-chip" bindtap="openDemo" data-scenario="student"><text class="demo-icon">01</text><text>学籍核验</text></view>
     <view class="demo-chip" bindtap="openDemo" data-scenario="scholarship"><text class="demo-icon">02</text><text>奖学金</text></view>
     <view class="demo-chip" bindtap="openDemo" data-scenario="extension"><text class="demo-icon">03</text><text>延期通知</text></view>

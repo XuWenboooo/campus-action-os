@@ -14,6 +14,7 @@ Page({
     canManual: false,
     manualTitle: '',
     manualDueAt: '',
+    demoMode: api.isDemoMode(),
   },
   onLoad(options) {
     if (options && options.scenario) {
@@ -28,8 +29,12 @@ Page({
     this.prepareDemo(scenario);
   },
   prepareDemo(scenario) {
+    if (!this.data.demoMode) {
+      this.setData({ error: '示例通知仅在开发 Demo 模式提供。' });
+      return;
+    }
     this.setData({ scenario, error: '' });
-    api.enterDemoScenario(scenario).then(() => api.getDemoScenario(scenario)).then((result) => this.setData({ scenarioLabel: result.label, text: result.source }));
+    api.enterDemoScenario(scenario).then(() => api.getDemoScenario(scenario)).then((result) => this.setData({ scenarioLabel: result.label, text: result.source })).catch(() => this.setData({ error: '示例通知读取失败，请检查 Demo 模式。' }));
   },
   chooseFile() {
     wx.chooseMessageFile({
@@ -93,13 +98,15 @@ Page({
         }
         wx.redirectTo({ url: `/pages/parse/parse?jobId=${job.parse_job_id}` });
       })
-      .catch(() =>
+      .catch((error) =>
         this.setData({
           loading: false,
           canManual: Boolean(this.data.documentId),
           error: this.data.documentId
             ? '解析失败，原文已保留；你仍可人工创建任务。'
-            : '导入失败，请查看错误详情后重试。',
+            : error && error.error && error.error.code === 'NETWORK_ERROR'
+              ? '导入失败，请检查 API 地址与网络。'
+              : '导入失败，请稍后重试。',
         }),
       );
   },

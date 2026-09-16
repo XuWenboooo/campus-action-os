@@ -5,9 +5,9 @@
     <view class="title task-title">{{task.title}}</view>
     <view class="deadline-card"><view class="caption">DEADLINE</view><view class="deadline">{{task.due_display || task.due_at || '待确认'}}</view><view class="muted">请在截止时间前完成</view></view>
     <view class="section-title">行动</view>
-    <view class="card"><view class="card-title">你需要做什么</view><view class="body-copy">{{actionSteps}}</view><view class="source">平台：{{task.platform}}</view></view>
+    <view class="card"><view class="card-title">你需要做什么</view><view class="body-copy">{{actionSteps}}</view><view class="source">平台：{{actionPlatform}}</view></view>
     <view class="section-title">条件与证据</view>
-    <view class="card"><view class="row"><text class="caption">CONDITION</text><text class="tag blue">已核验</text></view><view class="body-copy">{{action ? action.condition : '请根据原通知完成。'}}</view><view class="evidence-link" bindtap="openEvidence">查看原文依据 →</view></view>
+    <view class="card"><view class="row"><text class="caption">CONDITION</text><text class="tag blue">已核验</text></view><view class="body-copy">{{actionCondition}}</view><view class="evidence-link" bindtap="openEvidence">查看原文依据 →</view></view>
     <view class="section-title">History</view>
     <view class="history card"><view class="history-label"><text class="history-dot"></text>任务创建</view><text class="history-time caption">09-13 10:24</text><view class="history-label"><text class="history-dot"></text>最近更新</view><text class="history-time caption">09-14 15:02</text></view>
   </view>

@@ -2,13 +2,14 @@
   <view class="eyebrow">IMPORT / 01</view>
   <view class="title">把通知丢进来，<br/>剩下的交给我们。</view>
   <view class="muted intro">文字、截图或 PDF 都可以。我们会把它编译成你的行动。</view>
-  <view class="input-tabs"><view class="input-tab active">粘贴文字</view><view class="input-tab">截图</view><view class="input-tab">PDF</view></view>
+  <view class="input-tabs"><view class="input-tab active">粘贴文字</view><view class="input-tab">截图</view><view class="input-tab">PDF</view><view class="input-tab disabled">录音</view></view>
   <textarea class="notice-input" value="{{text}}" placeholder="在这里粘贴校园通知原文" maxlength="100000" bindinput="onInput" />
   <view class="source-hint" wx:if="{{scenarioLabel}}"><text class="tag blue">示例通知</text> {{scenarioLabel}}</view>
   <button class="button secondary" disabled="{{loading}}" bindtap="chooseFile">＋ 选择截图 / PDF 文件</button>
   <view class="muted file-name" wx:if="{{fileName}}">已选择：{{fileName}}</view>
-  <view class="sample-title">或者，直接试试示例通知</view>
-  <view class="sample-row">
+  <view class="card muted">录音导入：当前真实 API 尚未提供小程序音频上传与 ASR 入口，暂不可用。</view>
+  <view class="sample-title" wx:if="{{demoMode}}">或者，直接试试示例通知</view>
+  <view class="sample-row" wx:if="{{demoMode}}">
     <view class="sample-chip" bindtap="loadScenario" data-scenario="student">学籍核验</view>
     <view class="sample-chip" bindtap="loadScenario" data-scenario="scholarship">奖学金</view>
     <view class="sample-chip" bindtap="loadScenario" data-scenario="extension">延期通知</view>

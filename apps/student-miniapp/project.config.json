@@ -1,0 +1,29 @@
+{
+  "description": "Campus Action OS · 学生端小程序运行宿主（学生端边界）",
+  "compileType": "miniprogram",
+  "appid": "touristappid",
+  "projectname": "campus-action-os-student-miniapp",
+  "miniprogramRoot": "miniprogram/",
+  "setting": {
+    "urlCheck": false,
+    "es6": true,
+    "enhance": true,
+    "postcss": true,
+    "minified": false,
+    "coverView": true,
+    "nodeModules": false,
+    "checkSiteMap": true,
+    "ignoreDevUnusedFiles": false,
+    "ignoreUploadUnusedFiles": true,
+    "babelSetting": {
+      "ignore": [],
+      "disablePlugins": [],
+      "outputPath": ""
+    }
+  },
+  "packOptions": {
+    "ignore": [],
+    "include": []
+  },
+  "condition": {}
+}

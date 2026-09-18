@@ -1,0 +1,43 @@
+.btn-ghost {
+  margin-top: 16rpx;
+  background: #ffffff;
+  color: #2563eb;
+  border: 1rpx solid #bfdbfe;
+}
+
+.node-meta {
+  margin-top: 6rpx;
+  font-size: 22rpx;
+  color: #64748b;
+}
+
+.node-evidence {
+  margin-top: 12rpx;
+  padding: 12rpx 16rpx;
+  background: #f8fafc;
+  border-left: 4rpx solid #93c5fd;
+  border-radius: 0 8rpx 8rpx 0;
+  font-size: 22rpx;
+  color: #475569;
+  line-height: 1.7;
+}
+
+.principle {
+  position: relative;
+  padding-left: 28rpx;
+  margin-bottom: 14rpx;
+  font-size: 25rpx;
+  color: #334155;
+  line-height: 1.7;
+}
+
+.principle::before {
+  content: '';
+  position: absolute;
+  left: 6rpx;
+  top: 16rpx;
+  width: 10rpx;
+  height: 10rpx;
+  border-radius: 50%;
+  background: #2563eb;
+}

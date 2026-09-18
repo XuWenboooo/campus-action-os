@@ -1,0 +1,12 @@
+{
+  "pages": ["pages/index/index"],
+  "window": {
+    "backgroundTextStyle": "light",
+    "backgroundColor": "#f4f6fa",
+    "navigationBarBackgroundColor": "#0f172a",
+    "navigationBarTitleText": "Campus Action OS",
+    "navigationBarTextStyle": "white"
+  },
+  "style": "v2",
+  "sitemapLocation": "sitemap.json"
+}

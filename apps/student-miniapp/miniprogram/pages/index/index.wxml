@@ -1,0 +1,61 @@
+<view class="page">
+
+  <view class="hero">
+    <view class="hero-tag">学生端宿主 · Student Miniapp</view>
+    <view class="hero-title">Campus Action OS</view>
+    <view class="hero-sub">把非结构化校园通知转换为可核验、可执行、可追踪的行动</view>
+  </view>
+
+  <view class="card">
+    <view class="card-title">运行状态</view>
+    <view class="row" wx:for="{{statusRows}}" wx:key="key">
+      <view class="row-label">{{item.label}}</view>
+      <view class="row-value {{item.state}}">{{item.value}}</view>
+    </view>
+  </view>
+
+  <view class="card">
+    <view class="card-title">服务边界探测</view>
+    <view class="muted">探测 API 边界 {{apiBaseUrl}}/health。需在开发者工具「详情 → 本地设置」勾选「不校验合法域名」；服务端未启动时本项会失败，属预期情况。</view>
+    <button class="btn" bindtap="onProbe" loading="{{probing}}">探测 API 边界</button>
+    <view class="probe {{probeState}}" wx:if="{{probeText}}">{{probeText}}</view>
+  </view>
+
+  <view class="card">
+    <view class="card-title">通知 → 行动（本地演示）</view>
+    <view class="muted">真实 AI 解析尚未接入。下方生成的是符合 action-graph/v1 的确定性演示数据，仅用于验证宿主渲染链路。</view>
+    <textarea class="input" value="{{noticeText}}" bindinput="onNoticeInput" maxlength="500" auto-height placeholder="粘贴校园通知文本"></textarea>
+    <button class="btn" bindtap="onGenerateGraph">生成行动图</button>
+    <button class="btn btn-ghost" bindtap="onResetSample">恢复示例通知</button>
+  </view>
+
+  <view class="card" wx:if="{{hasGraph}}">
+    <view class="card-title">Action Graph · {{graph.graph_id}}</view>
+    <view class="muted">协议 {{graph.schema_version}}　节点 {{graph.node_count}} 个 · 边 {{graph.edge_count}} 条。下列摘要与原文证据属视图层补充字段，不由协议定义。</view>
+
+    <view class="node" wx:for="{{graph.nodesView}}" wx:key="node_id">
+      <view class="node-head">
+        <text class="node-id">{{item.node_id}}</text>
+        <text class="node-type type-{{item.node_type}}">{{item.node_type}}</text>
+      </view>
+      <view class="node-body">{{item.summary}}</view>
+      <view class="node-meta" wx:if="{{item.groups}}">人群：{{item.groups}}</view>
+      <view class="node-meta" wx:if="{{item.conditions}}">条件：{{item.conditions}}</view>
+      <view class="node-evidence" wx:if="{{item.evidence}}">原文证据：{{item.evidence}}</view>
+    </view>
+
+    <view class="card-sub">边 · {{graph.edge_count}} 条</view>
+    <view class="edge" wx:for="{{graph.edgesView}}" wx:key="edge_id">
+      <text class="edge-name">{{item.from_node_id}} → {{item.to_node_id}}</text>
+      <text class="edge-type">{{item.edge_label}}</text>
+    </view>
+  </view>
+
+  <view class="card">
+    <view class="card-title">设计原则</view>
+    <view class="principle" wx:for="{{principles}}" wx:key="*this">{{item}}</view>
+  </view>
+
+  <view class="foot">{{hostStage}}｜本页面为运行宿主骨架，业务页面与真实解析能力仍未实现。</view>
+
+</view>
